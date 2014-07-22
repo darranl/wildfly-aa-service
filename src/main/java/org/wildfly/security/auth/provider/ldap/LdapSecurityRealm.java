@@ -20,6 +20,7 @@ package org.wildfly.security.auth.provider.ldap;
 
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Collection;
 
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
@@ -36,6 +37,7 @@ import org.wildfly.security.auth.principal.NamePrincipal;
 import org.wildfly.security.auth.provider.CredentialSupport;
 import org.wildfly.security.auth.provider.SecurityRealm;
 import org.wildfly.security.auth.verifier.Verifier;
+import org.wildfly.security.password.Password;
 
 /**
  * Security realm implementation backed by LDAP.
@@ -48,9 +50,12 @@ class LdapSecurityRealm implements SecurityRealm {
     private final PrincipalMapping principalMapping;
     private final PrincipalMapper principalMapper;
 
-    LdapSecurityRealm(final DirContextFactory dirContextFactory, final PrincipalMapping principalMapping) {
+    private final Collection<CredentialLoader> credentialLoaders;
+
+    LdapSecurityRealm(final DirContextFactory dirContextFactory, final PrincipalMapping principalMapping, final Collection<CredentialLoader> credentialLoaders) {
         this.dirContextFactory = dirContextFactory;
         this.principalMapping = principalMapping;
+        this.credentialLoaders = credentialLoaders;
         principalMapper = initialisePrincipalMapper(principalMapping);
     }
 
@@ -95,8 +100,23 @@ class LdapSecurityRealm implements SecurityRealm {
 
     @Override
     public CredentialSupport getCredentialSupport(Class<?> credentialType) {
-        // TODO Auto-generated method stub
-        return null;
+        CredentialSupport response = CredentialSupport.UNSUPPORTED;
+        if (Password.class.isAssignableFrom(credentialType) == false) {
+            return response;
+        }
+
+        for (CredentialLoader current : credentialLoaders) {
+            CredentialSupport support = current.getCredentialSupport(dirContextFactory, credentialType);
+            if (support.isDefinitelySupported()) {
+                // One claiming it is definately supported is enough!
+                return support;
+            }
+            if (response.compareTo(support) < 0) {
+                response = support;
+            }
+        }
+
+        return response;
     }
 
     @Override
