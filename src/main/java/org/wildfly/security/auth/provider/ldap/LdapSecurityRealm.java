@@ -121,7 +121,17 @@ class LdapSecurityRealm implements SecurityRealm {
 
     @Override
     public CredentialSupport getCredentialSupport(Principal principal, Class<?> credentialType) {
-        // TODO Auto-generated method stub
+        if (getCredentialSupport(credentialType) == CredentialSupport.UNSUPPORTED) {
+            return CredentialSupport.UNSUPPORTED;
+        }
+
+        if (principal instanceof X500Principal) {
+
+        }
+
+
+
+
         return null;
     }
 
