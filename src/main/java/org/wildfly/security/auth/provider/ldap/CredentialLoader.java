@@ -24,6 +24,9 @@ import org.wildfly.security.auth.provider.CredentialSupport;
  * Within LDAP credentials could be stored in different ways, splitting out a CredentialLoader allows different strategies to be
  * plugged into the realm.
  *
+ * This interface allows for general checks to be made on the supported credential types and also enables the realm to obtain an
+ * identity specific {@link IdentityCredentialLoader}.
+ *
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
 interface CredentialLoader {
@@ -43,5 +46,17 @@ interface CredentialLoader {
      * @return the level of support for this credential type
      */
     CredentialSupport getCredentialSupport(DirContextFactory contextFactory, Class<?> credentialType);
+
+    /**
+     * Obtain an {@link IdentityCredentialLoader} to query the credentials for a specific identity.
+     *
+     * Note: By this point referrals relating to the identity should have been resolved so the {@link DirContextFactory} should
+     * be suitable for use with the supplied {@code distinguishedName}
+     *
+     * @param contextFactory the {@link DirContextFactory} to use to connect to LDAP.
+     * @param distinguishedName the ditinguished name of the identity.
+     * @return An {@link IdentityCredentialLoader} for the specified identity identified by their distinguished name.
+     */
+    IdentityCredentialLoader forIdentity(DirContextFactory contextFactory, String distinguishedName);
 
 }

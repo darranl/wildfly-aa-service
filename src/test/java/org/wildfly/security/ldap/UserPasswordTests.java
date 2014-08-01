@@ -24,6 +24,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.wildfly.security.auth.provider.CredentialSupport;
+import org.wildfly.security.auth.provider.RealmIdentity;
 import org.wildfly.security.auth.provider.SecurityRealm;
 import org.wildfly.security.auth.provider.ldap.DirContextFactory;
 import org.wildfly.security.auth.provider.ldap.LdapSecurityRealmBuilder;
@@ -91,6 +92,24 @@ public class UserPasswordTests {
                 simpleToDnRealm.getCredentialSupport(ClearPassword.class));
         assertEquals("ClearPassword possibly supported.", CredentialSupport.POSSIBLY_SUPPORTED,
                 simpleToSimpleRealm.getCredentialSupport(ClearPassword.class));
+    }
+
+    @Test
+    public void testPlainUser() {
+        RealmIdentity realmIdentity = simpleToDnRealm.createRealmIdentity("plainUser");
+        CredentialSupport support = simpleToDnRealm.getCredentialSupport(ClearPassword.class);
+        assertEquals("Pre identity", CredentialSupport.POSSIBLY_SUPPORTED, support);
+        support = realmIdentity.getCredentialSupport(ClearPassword.class);
+        assertEquals("Post identity", CredentialSupport.SUPPORTED, support);
+    }
+
+    @Test
+    public void testSha512User() {
+        RealmIdentity realmIdentity = simpleToDnRealm.createRealmIdentity("sha512User");
+        CredentialSupport support = simpleToDnRealm.getCredentialSupport(ClearPassword.class);
+        assertEquals("Pre identity", CredentialSupport.POSSIBLY_SUPPORTED, support);
+        support = realmIdentity.getCredentialSupport(ClearPassword.class);
+        assertEquals("Post identity", CredentialSupport.SUPPORTED, support);
     }
 
 }

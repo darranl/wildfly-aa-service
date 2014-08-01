@@ -106,7 +106,7 @@ class LdapSecurityRealm implements SecurityRealm {
 
     private class LdapRealmIdentity implements RealmIdentity {
 
-        private boolean loaded = false;
+        private boolean loadedNames = false;
         private String simpleName;
         private String distinguishedName;
         private Principal principal;
@@ -119,7 +119,11 @@ class LdapSecurityRealm implements SecurityRealm {
         private LdapRealmIdentity(final Principal principal) {
             assert principal instanceof NamePrincipal || principal instanceof X500Principal;
             if (principal instanceof NamePrincipal) {
-                simpleName = principal.getName();
+                if (principalMapping.principalUseDn) {
+                    distinguishedName = principal.getName();
+                } else {
+                    simpleName = principal.getName();
+                }
             } else {
                 distinguishedName = principal.getName();
             }
@@ -127,10 +131,12 @@ class LdapSecurityRealm implements SecurityRealm {
         }
 
         private void loadNames() {
-            if (loaded == false) {
+            // TODO - We need a slightly different approach if the name was obtained from a Principal.
+
+            if (loadedNames == false) {
                 try {
                     NamePair np = loadNamePair(simpleName, distinguishedName);
-                    loaded = true;
+                    loadedNames = true;
                     simpleName = np.simpleName;
                     distinguishedName = np.distinguishedName;
                 } catch (NamingException e) {
@@ -143,7 +149,7 @@ class LdapSecurityRealm implements SecurityRealm {
         public Principal getPrincipal() {
             if (principal == null) {
                 loadNames();
-                if (loaded) {
+                if (loadedNames) {
                     if (principalMapping.principalUseDn) {
                         try {
                             principal = new X500Principal(distinguishedName);
@@ -171,8 +177,30 @@ class LdapSecurityRealm implements SecurityRealm {
                 return CredentialSupport.UNSUPPORTED;
             }
 
-            // TODO Auto-generated method stub
-            return null;
+            CredentialSupport support = null;
+
+            for (CredentialLoader current : credentialLoaders) {
+                if (current.getCredentialSupport(dirContextFactory, credentialType).mayBeSupported()) {
+                    loadNames();
+                    IdentityCredentialLoader icl = current.forIdentity(dirContextFactory, distinguishedName);
+
+                    CredentialSupport temp = icl.getCredentialSupport(credentialType);
+                    if (temp != null && temp.isDefinitelySupported()) {
+                        // As soon as one claims definite support we know it is supported.
+                        return temp;
+                    }
+
+                    if (support == null || support.compareTo(temp) < 0) {
+                        support = temp;
+                    }
+                }
+            }
+
+            if (support == null) {
+                return CredentialSupport.UNSUPPORTED;
+            }
+
+            return support;
         }
 
         @Override
