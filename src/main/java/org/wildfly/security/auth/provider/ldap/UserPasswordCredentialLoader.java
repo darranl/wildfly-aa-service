@@ -18,6 +18,7 @@
 
 package org.wildfly.security.auth.provider.ldap;
 
+import static org.wildfly.security.password.interfaces.ClearPassword.ALGORITHM_CLEAR;
 import java.nio.charset.Charset;
 import java.util.Map;
 
@@ -29,6 +30,8 @@ import javax.naming.directory.DirContext;
 import org.wildfly.security.auth.login.AuthenticationException;
 import org.wildfly.security.auth.provider.CredentialSupport;
 import org.wildfly.security.auth.verifier.Verifier;
+import org.wildfly.security.password.spec.ClearPasswordSpec;
+import org.wildfly.security.password.spec.PasswordSpec;
 
 /**
  * A {@link CredentialLoader} for loading credentials stored within the 'userPassword' attribute of LDAP entries.
@@ -38,6 +41,8 @@ import org.wildfly.security.auth.verifier.Verifier;
 class UserPasswordCredentialLoader implements CredentialLoader {
 
     private static final Charset UTF_8 = Charset.forName("UTF-8");
+
+    private static final byte[] SHA_512 = "{sha512}".getBytes(UTF_8);
 
     static final String DEFAULT_USER_PASSWORD_ATTRIBUTE_NAME = "userPassword";
 
@@ -67,8 +72,6 @@ class UserPasswordCredentialLoader implements CredentialLoader {
         return new ForIdentityLoader(contextFactory, distinguishedName);
     }
 
-
-
     private class ForIdentityLoader implements IdentityCredentialLoader {
 
         private final DirContextFactory contextFactory;
@@ -81,35 +84,35 @@ class UserPasswordCredentialLoader implements CredentialLoader {
 
         @Override
         public CredentialSupport getCredentialSupport(Class<?> credentialType) {
-            DirContext context = null;
-            try {
-                context =  contextFactory.obtainDirContext(null);
-
-                Attributes attributes = context.getAttributes(distinguishedName, new String[] { userPasswordAttributeName });
-                Attribute attribute = attributes.get(userPasswordAttributeName);
-                for (int i = 0; i < attribute.size(); i++) {
-                    Object attributeValue = attribute.get(i);
-                    String value;
-                    if (attributeValue instanceof byte[]) {
-                        value = new String((byte[]) attributeValue, UTF_8);
-                    } else {
-                        value = attributeValue.toString();
-                    }
-                    System.out.println(value);
-                }
-
-                return null;
-            } catch (NamingException e) {
-                return CredentialSupport.UNSUPPORTED;
-            } finally {
-                contextFactory.returnContext(context);
+            Object credential = getCredential(credentialType);
+            // By this point it is either supported or it isn't - no in-between.
+            if (credential != null && credentialType.isInstance(credential)) {
+                return CredentialSupport.SUPPORTED;
             }
+
+            return CredentialSupport.UNSUPPORTED;
         }
 
         @Override
         public <C> C getCredential(Class<C> credentialType) {
-            // TODO Auto-generated method stub
-            return null;
+            DirContext context = null;
+            try {
+                context = contextFactory.obtainDirContext(null);
+
+                Attributes attributes = context.getAttributes(distinguishedName, new String[] { userPasswordAttributeName });
+                Attribute attribute = attributes.get(userPasswordAttributeName);
+                for (int i = 0; i < attribute.size(); i++) {
+                    byte[] value = (byte[]) attribute.get(i);
+                    System.out.println(new String(value, UTF_8));
+
+                }
+
+                return null;
+            } catch (NamingException e) {
+                return null;
+            } finally {
+                contextFactory.returnContext(context);
+            }
         }
 
         @Override
@@ -118,8 +121,47 @@ class UserPasswordCredentialLoader implements CredentialLoader {
             return null;
         }
 
+    }
 
+    private PasswordSpec toPasswordSpec(byte[] credential) {
+        assert credential != null && credential.length > 0;
 
+        if (credential[0] == '{') {
+            if (startsWith(SHA_512, credential)) {
+
+            }
+            for (int i = 1; i < credential.length - 1; i++) {
+                if (credential[i] == '}') {
+                    // A credential type was specified, we don't support it.
+                    return null;
+                }
+            }
+        }
+
+        return new ClearPasswordSpec(new String(credential, UTF_8).toCharArray());
+    }
+
+    private boolean startsWith(byte[] start, byte[] credential) {
+        if (start.length > credential.length) {
+            return false;
+        }
+
+        for (int i = 0; i < start.length; i++) {
+            if (start[i] != credential[i]) {
+                return false;
+            }
+
+        }
+
+        return true;
+    }
+
+    private String toAlgorithm(PasswordSpec passwordSpec) {
+        if (passwordSpec instanceof ClearPasswordSpec) {
+            return ALGORITHM_CLEAR;
+        }
+
+        return null;
     }
 
 }
