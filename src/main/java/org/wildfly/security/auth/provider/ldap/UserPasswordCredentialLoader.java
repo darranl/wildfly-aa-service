@@ -18,8 +18,12 @@
 
 package org.wildfly.security.auth.provider.ldap;
 
+import static org.wildfly.security.auth.provider.ldap.UserPasswordPasswordUtils.UTF_8;
+import static org.wildfly.security.auth.provider.ldap.UserPasswordPasswordUtils.parseUserPassword;
 import static org.wildfly.security.password.interfaces.ClearPassword.ALGORITHM_CLEAR;
-import java.nio.charset.Charset;
+
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 import java.util.Map;
 
 import javax.naming.NamingException;
@@ -30,6 +34,8 @@ import javax.naming.directory.DirContext;
 import org.wildfly.security.auth.login.AuthenticationException;
 import org.wildfly.security.auth.provider.CredentialSupport;
 import org.wildfly.security.auth.verifier.Verifier;
+import org.wildfly.security.password.Password;
+import org.wildfly.security.password.PasswordFactory;
 import org.wildfly.security.password.spec.ClearPasswordSpec;
 import org.wildfly.security.password.spec.PasswordSpec;
 
@@ -39,10 +45,6 @@ import org.wildfly.security.password.spec.PasswordSpec;
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
 class UserPasswordCredentialLoader implements CredentialLoader {
-
-    private static final Charset UTF_8 = Charset.forName("UTF-8");
-
-    private static final byte[] SHA_512 = "{sha512}".getBytes(UTF_8);
 
     static final String DEFAULT_USER_PASSWORD_ATTRIBUTE_NAME = "userPassword";
 
@@ -103,12 +105,21 @@ class UserPasswordCredentialLoader implements CredentialLoader {
                 Attribute attribute = attributes.get(userPasswordAttributeName);
                 for (int i = 0; i < attribute.size(); i++) {
                     byte[] value = (byte[]) attribute.get(i);
-                    System.out.println(new String(value, UTF_8));
 
+                    PasswordSpec spec = parseUserPassword(value);
+                    PasswordFactory pf = PasswordFactory.getInstance(toAlgorithm(spec));
+
+                    Password password = pf.generatePassword(spec);
+
+                    if (credentialType.isInstance(password)) {
+                        return credentialType.cast(password);
+                    }
+
+                    System.out.println(new String(value, UTF_8));
                 }
 
                 return null;
-            } catch (NamingException e) {
+            } catch (NamingException | InvalidKeySpecException | NoSuchAlgorithmException e) {
                 return null;
             } finally {
                 contextFactory.returnContext(context);
@@ -121,47 +132,13 @@ class UserPasswordCredentialLoader implements CredentialLoader {
             return null;
         }
 
-    }
-
-    private PasswordSpec toPasswordSpec(byte[] credential) {
-        assert credential != null && credential.length > 0;
-
-        if (credential[0] == '{') {
-            if (startsWith(SHA_512, credential)) {
-
-            }
-            for (int i = 1; i < credential.length - 1; i++) {
-                if (credential[i] == '}') {
-                    // A credential type was specified, we don't support it.
-                    return null;
-                }
-            }
-        }
-
-        return new ClearPasswordSpec(new String(credential, UTF_8).toCharArray());
-    }
-
-    private boolean startsWith(byte[] start, byte[] credential) {
-        if (start.length > credential.length) {
-            return false;
-        }
-
-        for (int i = 0; i < start.length; i++) {
-            if (start[i] != credential[i]) {
-                return false;
+        private String toAlgorithm(PasswordSpec passwordSpec) {
+            if (passwordSpec instanceof ClearPasswordSpec) {
+                return ALGORITHM_CLEAR;
             }
 
+            return null;
         }
-
-        return true;
-    }
-
-    private String toAlgorithm(PasswordSpec passwordSpec) {
-        if (passwordSpec instanceof ClearPasswordSpec) {
-            return ALGORITHM_CLEAR;
-        }
-
-        return null;
     }
 
 }
