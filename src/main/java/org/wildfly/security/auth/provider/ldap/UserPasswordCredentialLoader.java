@@ -38,6 +38,7 @@ import org.wildfly.security.password.Password;
 import org.wildfly.security.password.PasswordFactory;
 import org.wildfly.security.password.spec.ClearPasswordSpec;
 import org.wildfly.security.password.spec.PasswordSpec;
+import org.wildfly.security.password.spec.TrivialDigestPasswordSpec;
 
 /**
  * A {@link CredentialLoader} for loading credentials stored within the 'userPassword' attribute of LDAP entries.
@@ -135,6 +136,8 @@ class UserPasswordCredentialLoader implements CredentialLoader {
         private String toAlgorithm(PasswordSpec passwordSpec) {
             if (passwordSpec instanceof ClearPasswordSpec) {
                 return ALGORITHM_CLEAR;
+            } else if (passwordSpec instanceof TrivialDigestPasswordSpec) {
+                return ((TrivialDigestPasswordSpec) passwordSpec).getAlgorithm();
             }
 
             return null;

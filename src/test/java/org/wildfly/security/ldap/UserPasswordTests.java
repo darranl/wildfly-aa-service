@@ -30,6 +30,7 @@ import org.wildfly.security.auth.provider.ldap.DirContextFactory;
 import org.wildfly.security.auth.provider.ldap.LdapSecurityRealmBuilder;
 import org.wildfly.security.auth.provider.ldap.SimpleDirContextFactoryBuilder;
 import org.wildfly.security.password.interfaces.ClearPassword;
+import org.wildfly.security.password.interfaces.TrivialDigestPassword;
 
 /**
  * Test case to test access to passwords stored in LDAP using the 'userPassword' attribute.
@@ -61,6 +62,7 @@ public class UserPasswordTests {
                 .build()
                 .userPassword()
                 .addCredentialSupport(ClearPassword.class, CredentialSupport.POSSIBLY_SUPPORTED)
+                .addCredentialSupport(TrivialDigestPassword.class, CredentialSupport.POSSIBLY_SUPPORTED)
                 .build()
                 .build();
 
@@ -76,6 +78,7 @@ public class UserPasswordTests {
                 .build()
                 .userPassword()
                 .addCredentialSupport(ClearPassword.class, CredentialSupport.POSSIBLY_SUPPORTED)
+                .addCredentialSupport(TrivialDigestPassword.class, CredentialSupport.POSSIBLY_SUPPORTED)
                 .build()
                 .build();
     }
@@ -106,9 +109,9 @@ public class UserPasswordTests {
     @Test
     public void testSha512User() {
         RealmIdentity realmIdentity = simpleToDnRealm.createRealmIdentity("sha512User");
-        CredentialSupport support = simpleToDnRealm.getCredentialSupport(ClearPassword.class);
+        CredentialSupport support = simpleToDnRealm.getCredentialSupport(TrivialDigestPassword.class);
         assertEquals("Pre identity", CredentialSupport.POSSIBLY_SUPPORTED, support);
-        support = realmIdentity.getCredentialSupport(ClearPassword.class);
+        support = realmIdentity.getCredentialSupport(TrivialDigestPassword.class);
         assertEquals("Post identity", CredentialSupport.SUPPORTED, support);
     }
 
