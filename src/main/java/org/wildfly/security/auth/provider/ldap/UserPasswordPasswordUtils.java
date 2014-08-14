@@ -62,16 +62,28 @@ class UserPasswordPasswordUtils {
                     // {sha512}
                     return createTrivialDigestSpec(ALGORITHM_DIGEST_SHA_512, 8, userPassword);
                 }
-                for (int i = 1; i < userPassword.length - 1; i++) {
-                    if (userPassword[i] == '}') {
-                        throw new InvalidKeySpecException();
-                    }
+            } else if (userPassword[1] == 's' && userPassword[2] == 's' && userPassword[3] == 'h' && userPassword[4] == 'a') {
+                if (userPassword[5] == '}') {
+                    // {ssha}
+                    return createTrivialSaltedPasswordSpec("", 6, userPassword);
+                } else if (userPassword[5] == '2' && userPassword[6] == '5' && userPassword[7] == '6' && userPassword[8] == '}') {
+                    // {ssha256}
+                    return createTrivialSaltedPasswordSpec("", 9, userPassword);
+                } else if (userPassword[5] == '3' && userPassword[6] == '8' && userPassword[7] == '4' && userPassword[8] == '}') {
+                    // {ssha384}
+                    return createTrivialSaltedPasswordSpec("", 9, userPassword);
+                } else if (userPassword[5] == '5' && userPassword[6] == '1' && userPassword[7] == '2' && userPassword[8] == '}') {
+                    // {ssha512}
+                    return createTrivialSaltedPasswordSpec("", 9, userPassword);
                 }
-                return createClearPasswordSpec(userPassword);
             }
+            for (int i = 1; i < userPassword.length - 1; i++) {
+                if (userPassword[i] == '}') {
+                    throw new InvalidKeySpecException();
+                }
+            }
+            return createClearPasswordSpec(userPassword);
         }
-
-        throw new InvalidKeySpecException();
     }
 
     private static PasswordSpec createClearPasswordSpec(byte[] userPassword) {
@@ -95,6 +107,11 @@ class UserPasswordPasswordUtils {
         Base64.base64DecodeB(new CharacterArrayIterator(encodedBase64), digest);
 
         return new TrivialDigestPasswordSpec(algorithm, digest);
+    }
+
+    private static PasswordSpec createTrivialSaltedPasswordSpec(String algorithm, int prefixSize, byte[] userPassword) {
+        System.out.println(new String(userPassword, UTF_8));
+        return null;
     }
 
 }
