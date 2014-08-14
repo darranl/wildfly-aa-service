@@ -19,6 +19,11 @@
 package org.wildfly.security.ldap;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
+
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -29,8 +34,11 @@ import org.wildfly.security.auth.provider.SecurityRealm;
 import org.wildfly.security.auth.provider.ldap.DirContextFactory;
 import org.wildfly.security.auth.provider.ldap.LdapSecurityRealmBuilder;
 import org.wildfly.security.auth.provider.ldap.SimpleDirContextFactoryBuilder;
+import org.wildfly.security.password.Password;
+import org.wildfly.security.password.PasswordFactory;
 import org.wildfly.security.password.interfaces.ClearPassword;
 import org.wildfly.security.password.interfaces.TrivialDigestPassword;
+import org.wildfly.security.password.spec.TrivialDigestPasswordSpec;
 
 /**
  * Test case to test access to passwords stored in LDAP using the 'userPassword' attribute.
@@ -90,29 +98,45 @@ public class UserPasswordTests {
     }
 
     @Test
-    public void testBeforePrincipal() {
-        assertEquals("ClearPassword possibly supported.", CredentialSupport.POSSIBLY_SUPPORTED,
-                simpleToDnRealm.getCredentialSupport(ClearPassword.class));
-        assertEquals("ClearPassword possibly supported.", CredentialSupport.POSSIBLY_SUPPORTED,
-                simpleToSimpleRealm.getCredentialSupport(ClearPassword.class));
+    public void testPlainUser() throws Exception {
+        performSimpleNameTest("plainUser", ClearPassword.class, ClearPassword.ALGORITHM_CLEAR, "plainPassword".toCharArray());
     }
 
     @Test
-    public void testPlainUser() {
-        RealmIdentity realmIdentity = simpleToDnRealm.createRealmIdentity("plainUser");
-        CredentialSupport support = simpleToDnRealm.getCredentialSupport(ClearPassword.class);
-        assertEquals("Pre identity", CredentialSupport.POSSIBLY_SUPPORTED, support);
-        support = realmIdentity.getCredentialSupport(ClearPassword.class);
-        assertEquals("Post identity", CredentialSupport.SUPPORTED, support);
+    public void testSha512User() throws Exception {
+        performSimpleNameTest("sha512User", TrivialDigestPassword.class, TrivialDigestPassword.ALGORITHM_DIGEST_SHA_512, "sha512Password".toCharArray());
     }
 
     @Test
-    public void testSha512User() {
-        RealmIdentity realmIdentity = simpleToDnRealm.createRealmIdentity("sha512User");
-        CredentialSupport support = simpleToDnRealm.getCredentialSupport(TrivialDigestPassword.class);
+    public void testSsha512User() throws Exception {
+        performSimpleNameTest("ssha512User", TrivialDigestPassword.class, TrivialDigestPassword.ALGORITHM_DIGEST_SHA_512, "ssha512Password".toCharArray());
+    }
+
+    @Test
+    public void testCryptUser() throws Exception {
+        performSimpleNameTest("cryptUser", ClearPassword.class, ClearPassword.ALGORITHM_CLEAR, "cryptPassword".toCharArray());
+    }
+
+    private void performSimpleNameTest(String simpleName, Class<?> credentialType, String algorithm, char[] password) throws NoSuchAlgorithmException, InvalidKeyException {
+        RealmIdentity realmIdentity = simpleToDnRealm.createRealmIdentity(simpleName);
+        CredentialSupport support = simpleToDnRealm.getCredentialSupport(credentialType);
         assertEquals("Pre identity", CredentialSupport.POSSIBLY_SUPPORTED, support);
-        support = realmIdentity.getCredentialSupport(TrivialDigestPassword.class);
-        assertEquals("Post identity", CredentialSupport.SUPPORTED, support);
+
+        verifyPasswordSupport(realmIdentity, credentialType);
+        verifyPassword(realmIdentity, credentialType, algorithm, password);
+    }
+
+    private void verifyPasswordSupport(RealmIdentity identity, Class<?> credentialType) {
+        CredentialSupport credentialSupport = identity.getCredentialSupport(credentialType);
+        assertEquals("Identity level support", CredentialSupport.SUPPORTED, credentialSupport);
+    }
+
+    private void verifyPassword(RealmIdentity identity, Class<?> credentialType, String algorithm, char[] password) throws NoSuchAlgorithmException, InvalidKeyException {
+        Password loadedPassword = (Password) identity.getCredential(credentialType);
+
+        PasswordFactory factory = PasswordFactory.getInstance(algorithm);
+        assertTrue("Valid Password", factory.verify(loadedPassword, password));
+        assertFalse("Invalid Password", factory.verify(loadedPassword, "LetMeIn".toCharArray()));
     }
 
 }

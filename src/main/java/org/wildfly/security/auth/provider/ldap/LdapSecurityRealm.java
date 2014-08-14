@@ -179,9 +179,9 @@ class LdapSecurityRealm implements SecurityRealm {
 
             CredentialSupport support = null;
 
+            loadNames();
             for (CredentialLoader current : credentialLoaders) {
                 if (current.getCredentialSupport(dirContextFactory, credentialType).mayBeSupported()) {
-                    loadNames();
                     IdentityCredentialLoader icl = current.forIdentity(dirContextFactory, distinguishedName);
 
                     CredentialSupport temp = icl.getCredentialSupport(credentialType);
@@ -205,15 +205,28 @@ class LdapSecurityRealm implements SecurityRealm {
 
         @Override
         public <P> P proveAuthentic(Verifier<P> verifier) throws AuthenticationException {
-            // TODO Auto-generated method stub
-            return null;
+            throw new AuthenticationException("Method not supported");
         }
 
         @Override
         public <C> C getCredential(Class<C> credentialType) {
+            if (LdapSecurityRealm.this.getCredentialSupport(credentialType) == CredentialSupport.UNSUPPORTED) {
+                // If not supported in general then definately not supported for a specific principal.
+                return null;
+            }
 
+            loadNames();
+            for (CredentialLoader current : credentialLoaders) {
+                if (current.getCredentialSupport(dirContextFactory, credentialType).mayBeSupported()) {
+                    IdentityCredentialLoader icl = current.forIdentity(dirContextFactory, distinguishedName);
 
-            // TODO Auto-generated method stub
+                    C credential = icl.getCredential(credentialType);
+                    if (credential != null) {
+                        return credential;
+                    }
+                }
+            }
+
             return null;
         }
 
