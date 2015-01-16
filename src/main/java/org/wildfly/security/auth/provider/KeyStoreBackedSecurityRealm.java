@@ -35,7 +35,6 @@ import org.wildfly.security.auth.principal.NamePrincipal;
 import org.wildfly.security.keystore.PasswordEntry;
 import org.wildfly.security.password.Password;
 import org.wildfly.security.password.PasswordFactory;
-import org.wildfly.security.password.spec.PasswordSpec;
 
 /**
  * A {@link KeyStore} backed {@link SecurityRealm} implementation.
