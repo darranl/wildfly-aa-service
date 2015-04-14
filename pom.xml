@@ -41,6 +41,7 @@
         <version.org.apache.directory.jdbm>2.0.0-M2</version.org.apache.directory.jdbm>
         <version.org.apache.directory.mavibot>1.0.0-M5</version.org.apache.directory.mavibot>
 
+        <version.io.undertow>1.2.0.Beta10</version.io.undertow>
         <version.org.jboss.byteman>2.2.0.1</version.org.jboss.byteman>
         <version.org.jboss.logging>3.1.4.GA</version.org.jboss.logging>
         <version.org.jboss.logmanager>1.5.2.Final</version.org.jboss.logmanager>
@@ -184,6 +185,17 @@
     </build>
 
     <dependencies>
+        <dependency>
+            <groupId>io.undertow</groupId>
+            <artifactId>undertow-core</artifactId>
+            <version>${version.io.undertow}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.undertow</groupId>
+                    <artifactId>undertow-build-config</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>org.jboss.logging</groupId>
             <artifactId>jboss-logging</artifactId>
