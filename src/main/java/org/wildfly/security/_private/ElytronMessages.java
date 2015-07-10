@@ -54,6 +54,7 @@ import org.wildfly.client.config.ConfigXMLParseException;
 import org.wildfly.security.asn1.ASN1Exception;
 import org.wildfly.security.auth.callback.FastUnsupportedCallbackException;
 import org.wildfly.security.auth.server.RealmUnavailableException;
+import org.wildfly.security.http.HttpAuthenticationException;
 import org.wildfly.security.util.DecodeException;
 
 /**
@@ -947,6 +948,14 @@ public interface ElytronMessages extends BasicLogger {
     @Message(id = 5148, value = "Invalid escape sequence")
     IllegalArgumentException invalidEscapeSequence();
 
+    /* http package */
+
+    @Message(id = 6000, value = "An incorrectly formatted '%s'header was encountered.")
+    HttpAuthenticationException incorrectlyFormattedHeader(String heanderName);
+
+    @Message(id = 6001, value = "An authentication attempt for user '%s' failed validation using mechanism '%s'.")
+    String authenticationFailed(String username, String mechanismName);
+
     /* asn1 package */
 
     @Message(id = 7001, value = "Unrecognized encoding algorithm")
@@ -1104,3 +1113,4 @@ public interface ElytronMessages extends BasicLogger {
     @Message(id = 8028, value = "Invalid algorithm \"%s\"")
     NoSuchAlgorithmException noSuchAlgorithmInvalidAlgorithm(String algorithm);
 }
+
