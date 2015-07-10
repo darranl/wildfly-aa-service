@@ -39,6 +39,7 @@ import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 
+import org.wildfly.security.auth.callback.AuthenticationCompleteCallback;
 import org.wildfly.security.auth.callback.PasswordVerifyCallback;
 import org.wildfly.security.auth.callback.SecurityIdentityCallback;
 import org.wildfly.security.http.HttpAuthenticationException;
@@ -113,10 +114,11 @@ class BasicAuthenticationMechanism implements HttpServerAuthenticationMechanism 
                         String username = usernameChars.toString();
                         if (authenticate(username, passwordChars.array())) {
                             SecurityIdentityCallback securityIdentityCallback = new SecurityIdentityCallback();
-                            callbackHandler.handle(new Callback[] {securityIdentityCallback});
+                            callbackHandler.handle(new Callback[] { AuthenticationCompleteCallback.SUCCEEDED, securityIdentityCallback });
 
                             exchange.authenticationComplete(securityIdentityCallback.getSecurityIdentity());
                         } else {
+                            callbackHandler.handle(new Callback[] { AuthenticationCompleteCallback.FAILED });
                             exchange.authenticationFailed(log.authenticationFailed(username, BASIC));
                         }
                     } catch (IOException | UnsupportedCallbackException e) {
