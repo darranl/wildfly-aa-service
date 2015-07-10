@@ -20,10 +20,12 @@ package org.wildfly.security.auth.server;
 
 import static org.wildfly.security._private.ElytronMessages.log;
 
-import java.security.Security;
-import java.security.Provider;
 import java.security.PermissionCollection;
 import java.security.Principal;
+import java.security.Provider;
+import java.security.Provider.Service;
+import java.security.Security;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -38,11 +40,13 @@ import javax.security.sasl.SaslServerFactory;
 import org.wildfly.common.Assert;
 import org.wildfly.security._private.ElytronMessages;
 import org.wildfly.security.auth.principal.AnonymousPrincipal;
+import org.wildfly.security.auth.spi.ServerAuthenticationPolicy;
 import org.wildfly.security.authz.Attributes;
 import org.wildfly.security.authz.AuthorizationIdentity;
 import org.wildfly.security.authz.PermissionMapper;
 import org.wildfly.security.authz.RoleDecoder;
 import org.wildfly.security.authz.RoleMapper;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
 import org.wildfly.security.permission.ElytronPermission;
 import org.wildfly.security.sasl.WildFlySasl;
 import org.wildfly.security.util._private.UnmodifiableArrayList;
@@ -153,6 +157,35 @@ public final class SecurityDomain {
      */
     public SSLServerSocketFactory getSslServerSocketFactory() {
         throw new UnsupportedOperationException();
+    }
+
+    public List<String> getHttpServerMechanismNames() {
+        ArrayList<String> foundMechanisms = new ArrayList<>();
+        Provider[] providers = this.providers.get();
+        Map<String, Object> policy = new HashMap<String, Object>();
+        // TODO - The following interface will most likely not remain functional (if it remains at all).
+        policy.put(ServerAuthenticationPolicy.class.getName(), (ServerAuthenticationPolicy) (Class<?> c) -> getCredentialSupport(c));
+
+        for (Provider current : providers) {
+            current.getServices().forEach(
+                    (Service s) -> {
+                        if (HttpServerAuthenticationMechanismFactory.class.getSimpleName().equals(s.getType())) {
+                            try {
+                                HttpServerAuthenticationMechanismFactory factory = (HttpServerAuthenticationMechanismFactory) s
+                                        .newInstance(null);
+                                for (String currentMech : factory.getMechanismNames(policy)) {
+                                    if (foundMechanisms.contains(currentMech) == false) {
+                                        foundMechanisms.add(currentMech);
+                                    }
+                                }
+                            } catch (Exception e) {
+                            }
+
+                        }
+                    });
+        }
+
+        return Collections.unmodifiableList(foundMechanisms);
     }
 
     /**

@@ -23,8 +23,13 @@ import static org.wildfly.security._private.ElytronMessages.log;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
+import java.security.Provider;
+import java.security.Provider.Service;
 import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -56,6 +61,8 @@ import org.wildfly.security.auth.callback.SocketAddressCallback;
 import org.wildfly.security.auth.permission.RunAsPrincipalPermission;
 import org.wildfly.security.auth.principal.NamePrincipal;
 import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.http.HttpServerAuthenticationMechanism;
+import org.wildfly.security.http.HttpServerAuthenticationMechanismFactory;
 import org.wildfly.security.password.Password;
 import org.wildfly.security.password.PasswordFactory;
 import org.wildfly.security.password.TwoWayPassword;
@@ -80,6 +87,44 @@ public final class ServerAuthenticationContext {
 
     ServerAuthenticationContext(final SecurityDomain domain) {
         this.domain = domain;
+    }
+
+    /**
+     * Create the {@link HttpServerAuthenticationMechanism} instances to handle authentication for this request.
+     *
+     * @return the {@link HttpServerAuthenticationMechanism} instances to handle authentication.
+     */
+    public List<HttpServerAuthenticationMechanism> createHttpServerAuthenticationMechanisms() {
+        List<String> supportedMechanisms = new ArrayList<>(domain.getHttpServerMechanismNames());
+        // TODO - Here we sort and filter and manually clean things up.
+        CallbackHandler domainCallbackHandler = createCallbackHandler();
+        ArrayList<HttpServerAuthenticationMechanism> actualMechanisms = new ArrayList<>();
+
+        Provider[] providers = domain.getProviders();
+        for (Provider current : providers) {
+            if (supportedMechanisms.isEmpty()) {
+                break;
+            }
+            Iterator<String> mechsToAdd = supportedMechanisms.iterator();
+            while (mechsToAdd.hasNext()) {
+                String mech = mechsToAdd.next();
+                Service service = current.getService(HttpServerAuthenticationMechanismFactory.class.getSimpleName(), mech);
+
+                try {
+                    if (service != null) {
+                        HttpServerAuthenticationMechanismFactory factory = (HttpServerAuthenticationMechanismFactory) service.newInstance(null);
+                        HttpServerAuthenticationMechanism mechanismInstance = factory.createAuthenticationMechanism(mech, Collections.emptyMap(), domainCallbackHandler);
+                        if (mechanismInstance != null) {
+                            mechsToAdd.remove();
+                            actualMechanisms.add(mechanismInstance);
+                        }
+                    }
+                } catch (NoSuchAlgorithmException e) {
+                }
+            }
+        }
+
+        return Collections.unmodifiableList(actualMechanisms);
     }
 
     /**
