@@ -167,22 +167,25 @@ public final class SecurityDomain {
         policy.put(ServerAuthenticationPolicy.class.getName(), (ServerAuthenticationPolicy) (Class<?> c) -> getCredentialSupport(c));
 
         for (Provider current : providers) {
-            current.getServices().forEach(
-                    (Service s) -> {
-                        if (HttpServerAuthenticationMechanismFactory.class.getSimpleName().equals(s.getType())) {
-                            try {
-                                HttpServerAuthenticationMechanismFactory factory = (HttpServerAuthenticationMechanismFactory) s
-                                        .newInstance(null);
-                                for (String currentMech : factory.getMechanismNames(policy)) {
-                                    if (foundMechanisms.contains(currentMech) == false) {
-                                        foundMechanisms.add(currentMech);
-                                    }
-                                }
-                            } catch (Exception e) {
-                            }
+            Set<Service> services = current.getServices();
+            if (services != null) {
+                current.getServices()
+                        .forEach(
+                                (Service s) -> {
+                                    if (HttpServerAuthenticationMechanismFactory.class.getSimpleName().equals(s.getType())) {
+                                        try {
+                                            HttpServerAuthenticationMechanismFactory factory = (HttpServerAuthenticationMechanismFactory) s.newInstance(null);
+                                            for (String currentMech : factory.getMechanismNames(policy)) {
+                                                if (foundMechanisms.contains(currentMech) == false) {
+                                                    foundMechanisms.add(currentMech);
+                                                }
+                                            }
+                                        } catch (Exception e) {
+                                        }
 
-                        }
-                    });
+                                    }
+                                });
+            }
         }
 
         return Collections.unmodifiableList(foundMechanisms);
