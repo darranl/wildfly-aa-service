@@ -159,7 +159,7 @@ public final class SecurityDomain {
         throw new UnsupportedOperationException();
     }
 
-    public List<String> getHttpServerMechanismNames() {
+    List<String> getHttpServerMechanismNames() {
         ArrayList<String> foundMechanisms = new ArrayList<>();
         Provider[] providers = this.providers.get();
         Map<String, Object> policy = new HashMap<String, Object>();
