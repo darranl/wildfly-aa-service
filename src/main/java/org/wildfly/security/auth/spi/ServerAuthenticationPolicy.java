@@ -24,6 +24,7 @@ import org.wildfly.security.auth.server.CredentialSupport;
  *
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
+@FunctionalInterface
 public interface ServerAuthenticationPolicy {
 
 
