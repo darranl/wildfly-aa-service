@@ -33,7 +33,7 @@ import javax.security.auth.callback.CallbackHandler;
 public class ClientUtils {
     private static final AuthenticationContextConfigurationClient AUTH_CONFIGURATION_CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
-    public static CallbackHandler getCallbackHandler(URI uri, AuthenticationContext context) {
+    public static CallbackHandler getCallbackHandler(URI uri, ClientAuthenticationContext context) {
         AuthenticationConfiguration config = AUTH_CONFIGURATION_CLIENT.getAuthenticationConfiguration(uri, context);
         return config.getCallbackHandler();
     }

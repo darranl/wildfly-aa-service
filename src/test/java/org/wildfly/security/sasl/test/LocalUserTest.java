@@ -39,7 +39,7 @@ import javax.security.sasl.SaslServer;
 
 import org.junit.Test;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 import org.wildfly.security.auth.client.ClientUtils;
 import org.wildfly.security.auth.client.MatchRule;
 import org.wildfly.security.sasl.localuser.LocalUserServerFactory;
@@ -408,7 +408,7 @@ public class LocalUserTest extends BaseTestCase {
 
 
     private CallbackHandler createClientCallbackHandler(final String expectedUsername) throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY

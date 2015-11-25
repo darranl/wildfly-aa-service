@@ -32,14 +32,14 @@ import org.wildfly.security.Version;
 /**
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
-public final class AuthenticationContext {
+public final class ClientAuthenticationContext {
 
     static {
         Version.getVersion();
     }
 
-    private static final ThreadLocal<AuthenticationContext> currentIdentityContext = new ThreadLocal<AuthenticationContext>() {
-        protected AuthenticationContext initialValue() {
+    private static final ThreadLocal<ClientAuthenticationContext> currentIdentityContext = new ThreadLocal<ClientAuthenticationContext>() {
+        protected ClientAuthenticationContext initialValue() {
             try {
                 return DefaultAuthenticationContextProvider.DEFAULT;
             } catch (ExceptionInInitializerError error) {
@@ -52,13 +52,13 @@ public final class AuthenticationContext {
 
     private static final RuleConfigurationPair[] NO_RULES = new RuleConfigurationPair[0];
 
-    static final AuthenticationContext EMPTY = new AuthenticationContext();
+    static final ClientAuthenticationContext EMPTY = new ClientAuthenticationContext();
 
-    private AuthenticationContext() {
+    private ClientAuthenticationContext() {
         this(NO_RULES, false);
     }
 
-    AuthenticationContext(final RuleConfigurationPair[] rules, boolean clone) {
+    ClientAuthenticationContext(final RuleConfigurationPair[] rules, boolean clone) {
         if (clone) {
             this.rules = rules.clone();
         } else {
@@ -71,7 +71,7 @@ public final class AuthenticationContext {
      *
      * @return the new authentication context
      */
-    public static AuthenticationContext empty() {
+    public static ClientAuthenticationContext empty() {
         return EMPTY;
     }
 
@@ -80,7 +80,7 @@ public final class AuthenticationContext {
      *
      * @return the current thread's captured authentication context
      */
-    public static AuthenticationContext captureCurrent() {
+    public static ClientAuthenticationContext captureCurrent() {
         return currentIdentityContext.get();
     }
 
@@ -92,16 +92,16 @@ public final class AuthenticationContext {
      * @param configuration the configuration to select when the rule matches
      * @return the combined authentication context
      */
-    public AuthenticationContext with(MatchRule rule, AuthenticationConfiguration configuration) {
+    public ClientAuthenticationContext with(MatchRule rule, AuthenticationConfiguration configuration) {
         if (configuration == null || rule == null) return this;
         final RuleConfigurationPair[] rules = this.rules;
         final int length = rules.length;
         if (length == 0) {
-            return new AuthenticationContext(new RuleConfigurationPair[] { new RuleConfigurationPair(rule, configuration) }, false);
+            return new ClientAuthenticationContext(new RuleConfigurationPair[] { new RuleConfigurationPair(rule, configuration) }, false);
         } else {
             final RuleConfigurationPair[] copy = Arrays.copyOf(rules, length + 1);
             copy[length] = new RuleConfigurationPair(rule, configuration);
-            return new AuthenticationContext(copy, false);
+            return new ClientAuthenticationContext(copy, false);
         }
     }
 
@@ -112,7 +112,7 @@ public final class AuthenticationContext {
      * @param other the other authentication context
      * @return the combined authentication context
      */
-    public AuthenticationContext with(AuthenticationContext other) {
+    public ClientAuthenticationContext with(ClientAuthenticationContext other) {
         if (other == null) return this;
         final RuleConfigurationPair[] rules = this.rules;
         final RuleConfigurationPair[] otherRules = other.rules;
@@ -125,7 +125,7 @@ public final class AuthenticationContext {
         }
         final RuleConfigurationPair[] copy = Arrays.copyOf(rules, length + otherLength);
         System.arraycopy(otherRules, 0, copy, length, otherLength);
-        return new AuthenticationContext(copy, false);
+        return new ClientAuthenticationContext(copy, false);
     }
 
     /**
@@ -138,7 +138,7 @@ public final class AuthenticationContext {
      * @return the combined authentication context
      * @throws IndexOutOfBoundsException if the index is out of bounds
      */
-    public AuthenticationContext with(int idx, MatchRule rule, AuthenticationConfiguration configuration) throws IndexOutOfBoundsException {
+    public ClientAuthenticationContext with(int idx, MatchRule rule, AuthenticationConfiguration configuration) throws IndexOutOfBoundsException {
         if (configuration == null || rule == null) return this;
         final RuleConfigurationPair[] rules = this.rules;
         final int length = rules.length;
@@ -146,12 +146,12 @@ public final class AuthenticationContext {
             throw new IndexOutOfBoundsException();
         }
         if (length == 0) {
-            return new AuthenticationContext(new RuleConfigurationPair[] { new RuleConfigurationPair(rule, configuration) }, false);
+            return new ClientAuthenticationContext(new RuleConfigurationPair[] { new RuleConfigurationPair(rule, configuration) }, false);
         } else {
             final RuleConfigurationPair[] copy = Arrays.copyOf(rules, length + 1);
             System.arraycopy(copy, idx, copy, idx + 1, length - idx);
             copy[idx] = new RuleConfigurationPair(rule, configuration);
-            return new AuthenticationContext(copy, false);
+            return new ClientAuthenticationContext(copy, false);
         }
     }
 
@@ -165,7 +165,7 @@ public final class AuthenticationContext {
      * @return the combined authentication context
      * @throws IndexOutOfBoundsException if the index is out of bounds
      */
-    public AuthenticationContext replacing(int idx, MatchRule rule, AuthenticationConfiguration configuration) throws IndexOutOfBoundsException {
+    public ClientAuthenticationContext replacing(int idx, MatchRule rule, AuthenticationConfiguration configuration) throws IndexOutOfBoundsException {
         if (configuration == null || rule == null) return this;
         final RuleConfigurationPair[] rules = this.rules;
         final int length = rules.length;
@@ -174,7 +174,7 @@ public final class AuthenticationContext {
         }
         final RuleConfigurationPair[] copy = rules.clone();
         copy[idx] = new RuleConfigurationPair(rule, configuration);
-        return new AuthenticationContext(copy, false);
+        return new ClientAuthenticationContext(copy, false);
     }
 
     /**
@@ -186,7 +186,7 @@ public final class AuthenticationContext {
      * @return the combined authentication context
      * @throws IndexOutOfBoundsException if the index is out of bounds
      */
-    public AuthenticationContext with(int idx, AuthenticationContext other) throws IndexOutOfBoundsException {
+    public ClientAuthenticationContext with(int idx, ClientAuthenticationContext other) throws IndexOutOfBoundsException {
         final RuleConfigurationPair[] rules = this.rules;
         final int length = rules.length;
         if (idx == length) return with(other);
@@ -204,7 +204,7 @@ public final class AuthenticationContext {
             final RuleConfigurationPair[] copy = Arrays.copyOf(rules, length + otherLength);
             System.arraycopy(copy, idx, copy, idx + otherLength, length - idx);
             System.arraycopy(otherRules, 0, copy, idx, otherLength);
-            return new AuthenticationContext(copy, false);
+            return new ClientAuthenticationContext(copy, false);
         }
     }
 
@@ -216,7 +216,7 @@ public final class AuthenticationContext {
      * @return the modified authentication context
      * @throws IndexOutOfBoundsException if the index is out of bounds
      */
-    public AuthenticationContext without(int idx) throws IndexOutOfBoundsException {
+    public ClientAuthenticationContext without(int idx) throws IndexOutOfBoundsException {
         final RuleConfigurationPair[] rules = this.rules;
         final int length = rules.length;
         if (idx < 0 || idx >= length) {
@@ -235,7 +235,7 @@ public final class AuthenticationContext {
             copy = Arrays.copyOfRange(rules, 0, length - 1);
             System.arraycopy(rules, idx + 1, copy, idx, length - idx - 1);
         }
-        return new AuthenticationContext(copy, false);
+        return new ClientAuthenticationContext(copy, false);
     }
 
     int ruleMatching(URI uri) {
@@ -272,7 +272,7 @@ public final class AuthenticationContext {
      */
     public <T> T run(PrivilegedAction<T> action) {
         Assert.checkNotNullParam("action", action);
-        final AuthenticationContext oldSubj = currentIdentityContext.get();
+        final ClientAuthenticationContext oldSubj = currentIdentityContext.get();
         if (oldSubj == this) {
             return action.run();
         }
@@ -294,7 +294,7 @@ public final class AuthenticationContext {
      */
     public <T> T run(PrivilegedExceptionAction<T> action) throws PrivilegedActionException {
         Assert.checkNotNullParam("action", action);
-        final AuthenticationContext oldSubj = currentIdentityContext.get();
+        final ClientAuthenticationContext oldSubj = currentIdentityContext.get();
         if (oldSubj == this) {
             try {
                 return action.run();
@@ -329,7 +329,7 @@ public final class AuthenticationContext {
      */
     public <T, P> T run(P parameter, ParametricPrivilegedAction<T, P> action) {
         Assert.checkNotNullParam("action", action);
-        final AuthenticationContext oldSubj = currentIdentityContext.get();
+        final ClientAuthenticationContext oldSubj = currentIdentityContext.get();
         if (oldSubj == this) {
             return action.run(parameter);
         }
@@ -353,7 +353,7 @@ public final class AuthenticationContext {
      */
     public <T, P> T run(P parameter, ParametricPrivilegedExceptionAction<T, P> action) throws PrivilegedActionException {
         Assert.checkNotNullParam("action", action);
-        final AuthenticationContext oldSubj = currentIdentityContext.get();
+        final ClientAuthenticationContext oldSubj = currentIdentityContext.get();
         if (oldSubj == this) {
             try {
                 return action.run(parameter);

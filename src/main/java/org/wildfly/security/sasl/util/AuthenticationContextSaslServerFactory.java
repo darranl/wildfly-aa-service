@@ -25,16 +25,16 @@ import javax.security.sasl.SaslServer;
 import javax.security.sasl.SaslServerFactory;
 import javax.security.sasl.SaslException;
 
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 
 /**
- * A delegating {@link SaslServerFactory} which establishes a specific {@link AuthenticationContext} for the duration
+ * A delegating {@link SaslServerFactory} which establishes a specific {@link ClientAuthenticationContext} for the duration
  * of the authentication process.
  *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public final class AuthenticationContextSaslServerFactory extends AbstractDelegatingSaslServerFactory {
-    private final AuthenticationContext context;
+    private final ClientAuthenticationContext context;
 
     /**
      * Construct a new instance.
@@ -43,7 +43,7 @@ public final class AuthenticationContextSaslServerFactory extends AbstractDelega
      */
     public AuthenticationContextSaslServerFactory(final SaslServerFactory delegate) {
         super(delegate);
-        context = AuthenticationContext.captureCurrent();
+        context = ClientAuthenticationContext.captureCurrent();
     }
 
     /**
@@ -52,7 +52,7 @@ public final class AuthenticationContextSaslServerFactory extends AbstractDelega
      * @param delegate the delegate SASL server factory
      * @param context the authentication context to use
      */
-    public AuthenticationContextSaslServerFactory(final SaslServerFactory delegate, final AuthenticationContext context) {
+    public AuthenticationContextSaslServerFactory(final SaslServerFactory delegate, final ClientAuthenticationContext context) {
         super(delegate);
         this.context = context;
     }

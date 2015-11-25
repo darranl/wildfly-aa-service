@@ -26,7 +26,7 @@ import java.net.URI;
 import javax.security.auth.callback.CallbackHandler;
 
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 import org.wildfly.security.auth.client.ClientUtils;
 import org.wildfly.security.auth.client.MatchRule;
 import org.wildfly.security.password.Password;
@@ -37,7 +37,7 @@ import org.wildfly.security.password.Password;
 class ScramCallbackHandlerUtils {
 
     static CallbackHandler createClientCallbackHandler(final String username, final char[] password) throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY
@@ -50,7 +50,7 @@ class ScramCallbackHandlerUtils {
     }
 
     static CallbackHandler createClientCallbackHandler(final String username, final Password password) throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY

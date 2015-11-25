@@ -25,17 +25,17 @@ import javax.security.sasl.SaslClient;
 import javax.security.sasl.SaslException;
 
 import org.wildfly.security.ParametricPrivilegedExceptionAction;
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 
 /**
- * A delegating {@link SaslClient} which establishes a specific {@link AuthenticationContext} for the duration
+ * A delegating {@link SaslClient} which establishes a specific {@link ClientAuthenticationContext} for the duration
  * of the authentication process.
  *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public final class AuthenticationContextSaslClient extends AbstractDelegatingSaslClient {
 
-    private AuthenticationContext context;
+    private ClientAuthenticationContext context;
     private ParametricPrivilegedExceptionAction<byte[], byte[]> challengeAction = delegate::evaluateChallenge;
 
     /**
@@ -44,7 +44,7 @@ public final class AuthenticationContextSaslClient extends AbstractDelegatingSas
      * @param delegate the delegate SASL client
      * @param context the authentication context to use
      */
-    public AuthenticationContextSaslClient(final SaslClient delegate, final AuthenticationContext context) {
+    public AuthenticationContextSaslClient(final SaslClient delegate, final ClientAuthenticationContext context) {
         super(delegate);
         this.context = context;
     }
@@ -56,7 +56,7 @@ public final class AuthenticationContextSaslClient extends AbstractDelegatingSas
      */
     public AuthenticationContextSaslClient(final SaslClient delegate) {
         super(delegate);
-        context = AuthenticationContext.captureCurrent();
+        context = ClientAuthenticationContext.captureCurrent();
     }
 
     public byte[] evaluateChallenge(final byte[] challenge) throws SaslException {

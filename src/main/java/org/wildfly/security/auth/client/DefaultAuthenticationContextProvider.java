@@ -30,10 +30,10 @@ import java.security.PrivilegedAction;
  */
 class DefaultAuthenticationContextProvider {
 
-    static final AuthenticationContext DEFAULT;
+    static final ClientAuthenticationContext DEFAULT;
 
     static {
-        DEFAULT = doPrivileged((PrivilegedAction<AuthenticationContext>) () -> {
+        DEFAULT = doPrivileged((PrivilegedAction<ClientAuthenticationContext>) () -> {
             ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
             if (classLoader == null) {
                 classLoader = DefaultAuthenticationContextProvider.class.getClassLoader();

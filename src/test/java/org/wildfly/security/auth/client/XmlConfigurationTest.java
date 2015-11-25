@@ -44,7 +44,7 @@ public class XmlConfigurationTest {
             "<authentication-client xmlns=\"urn:elytron:1.0\">\n" +
             "    \n" +
             "</authentication-client>\n").getBytes(StandardCharsets.UTF_8);
-        final SecurityFactory<AuthenticationContext> factory = ElytronXmlParser.parseAuthenticationClientConfiguration(ConfigurationXMLStreamReader.openUri(URI.create("authentication-client.xml"), XMLInputFactory.newFactory(), new ByteArrayInputStream(xmlBytes)));
+        final SecurityFactory<ClientAuthenticationContext> factory = ElytronXmlParser.parseAuthenticationClientConfiguration(ConfigurationXMLStreamReader.openUri(URI.create("authentication-client.xml"), XMLInputFactory.newFactory(), new ByteArrayInputStream(xmlBytes)));
         factory.create();
     }
 
@@ -67,7 +67,7 @@ public class XmlConfigurationTest {
             "        </rule>\n" +
             "    </rules>\n" +
             "</authentication-client>\n").getBytes(StandardCharsets.UTF_8);
-        final SecurityFactory<AuthenticationContext> factory = ElytronXmlParser.parseAuthenticationClientConfiguration(ConfigurationXMLStreamReader.openUri(URI.create("authentication-client.xml"), XMLInputFactory.newFactory(), new ByteArrayInputStream(xmlBytes)));
+        final SecurityFactory<ClientAuthenticationContext> factory = ElytronXmlParser.parseAuthenticationClientConfiguration(ConfigurationXMLStreamReader.openUri(URI.create("authentication-client.xml"), XMLInputFactory.newFactory(), new ByteArrayInputStream(xmlBytes)));
         factory.create();
     }
 
@@ -90,7 +90,7 @@ public class XmlConfigurationTest {
             "    </rules>\n" +
             "</authentication-client>\n").getBytes(StandardCharsets.UTF_8);
         try {
-            final SecurityFactory<AuthenticationContext> factory = ElytronXmlParser.parseAuthenticationClientConfiguration(ConfigurationXMLStreamReader.openUri(URI.create("authentication-client.xml"), XMLInputFactory.newFactory(), new ByteArrayInputStream(xmlBytes)));
+            final SecurityFactory<ClientAuthenticationContext> factory = ElytronXmlParser.parseAuthenticationClientConfiguration(ConfigurationXMLStreamReader.openUri(URI.create("authentication-client.xml"), XMLInputFactory.newFactory(), new ByteArrayInputStream(xmlBytes)));
             factory.create();
         } catch (XMLStreamException e) {
             assertEquals(e.getLocation().getLineNumber(), 7);

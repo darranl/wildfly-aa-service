@@ -89,12 +89,12 @@ public final class ElytronXmlParser {
      * @return the authentication context factory
      * @throws ConfigXMLParseException if the resource failed to be parsed
      */
-    public static SecurityFactory<AuthenticationContext> parseAuthenticationClientConfiguration() throws ConfigXMLParseException {
+    public static SecurityFactory<ClientAuthenticationContext> parseAuthenticationClientConfiguration() throws ConfigXMLParseException {
         final ClientConfiguration clientConfiguration = ClientConfiguration.getInstance();
         if (clientConfiguration != null) try (final ConfigurationXMLStreamReader streamReader = clientConfiguration.readConfiguration(Collections.singleton(NS_ELYTRON_1_0))) {
             return parseAuthenticationClientConfiguration(streamReader);
         } else {
-            return new FixedSecurityFactory<>(AuthenticationContext.EMPTY);
+            return new FixedSecurityFactory<>(ClientAuthenticationContext.EMPTY);
         }
     }
 
@@ -105,7 +105,7 @@ public final class ElytronXmlParser {
      * @return the authentication context factory
      * @throws ConfigXMLParseException if the resource failed to be parsed
      */
-    static SecurityFactory<AuthenticationContext> parseAuthenticationClientConfiguration(ConfigurationXMLStreamReader reader) throws ConfigXMLParseException {
+    static SecurityFactory<ClientAuthenticationContext> parseAuthenticationClientConfiguration(ConfigurationXMLStreamReader reader) throws ConfigXMLParseException {
         if (reader.hasNext()) {
             switch (reader.nextTag()) {
                 case START_ELEMENT: {
@@ -115,7 +115,7 @@ public final class ElytronXmlParser {
                     }
                     switch (reader.getLocalName()) {
                         case "authentication-client": {
-                            SecurityFactory<AuthenticationContext> futureContext = parseAuthenticationClientType(reader);
+                            SecurityFactory<ClientAuthenticationContext> futureContext = parseAuthenticationClientType(reader);
                             while (reader.hasNext()) {
                                 switch (reader.next()) {
                                     case COMMENT:
@@ -143,7 +143,7 @@ public final class ElytronXmlParser {
                 }
             }
         }
-        return new FixedSecurityFactory<>(AuthenticationContext.EMPTY);
+        return new FixedSecurityFactory<>(ClientAuthenticationContext.EMPTY);
     }
 
     // authentication client types
@@ -155,8 +155,8 @@ public final class ElytronXmlParser {
      * @return the authentication context factory
      * @throws ConfigXMLParseException if the resource failed to be parsed
      */
-    public static SecurityFactory<AuthenticationContext> parseAuthenticationClientType(ConfigurationXMLStreamReader reader) throws ConfigXMLParseException {
-        SecurityFactory<AuthenticationContext> futureContext = null;
+    public static SecurityFactory<ClientAuthenticationContext> parseAuthenticationClientType(ConfigurationXMLStreamReader reader) throws ConfigXMLParseException {
+        SecurityFactory<ClientAuthenticationContext> futureContext = null;
         final int attributeCount = reader.getAttributeCount();
         if (attributeCount > 0) {
             throw reader.unexpectedAttribute(0);
@@ -203,7 +203,7 @@ public final class ElytronXmlParser {
                 if (netAuthenticator) {
                     Authenticator.setDefault(new ElytronAuthenticator());
                 }
-                return futureContext == null ? new FixedSecurityFactory<>(AuthenticationContext.EMPTY) : futureContext;
+                return futureContext == null ? new FixedSecurityFactory<>(ClientAuthenticationContext.EMPTY) : futureContext;
             } else {
                 throw reader.unexpectedContent();
             }
@@ -219,7 +219,7 @@ public final class ElytronXmlParser {
      * @return the authentication context factory
      * @throws ConfigXMLParseException if the resource failed to be parsed
      */
-    public static SecurityFactory<AuthenticationContext> parseAuthenticationClientRulesType(ConfigurationXMLStreamReader reader, final Map<String, SecurityFactory<KeyStore>> keyStoresMap) throws ConfigXMLParseException {
+    public static SecurityFactory<ClientAuthenticationContext> parseAuthenticationClientRulesType(ConfigurationXMLStreamReader reader, final Map<String, SecurityFactory<KeyStore>> keyStoresMap) throws ConfigXMLParseException {
         final int attributeCount = reader.getAttributeCount();
         if (attributeCount > 0) {
             throw reader.unexpectedAttribute(0);
@@ -242,7 +242,7 @@ public final class ElytronXmlParser {
                 }
             } else if (tag == END_ELEMENT) {
                 return new OneTimeSecurityFactory<>(() -> {
-                    AuthenticationContext context = AuthenticationContext.EMPTY;
+                    ClientAuthenticationContext context = ClientAuthenticationContext.EMPTY;
                     for (SecurityFactory<RuleConfigurationPair> pairFactory : rulesList) {
                         final RuleConfigurationPair pair = pairFactory.create();
                         context = context.with(pair.getMatchRule(), pair.getConfiguration());

@@ -38,7 +38,7 @@ import javax.security.sasl.SaslException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 import org.wildfly.security.auth.client.ClientUtils;
 import org.wildfly.security.auth.client.MatchRule;
 import org.wildfly.security.sasl.test.BaseTestCase;
@@ -745,7 +745,7 @@ public class CompatibilityClientTest extends BaseTestCase {
     }
 
     private CallbackHandler createClientCallbackHandler(String username, char[] password, String realm) throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY

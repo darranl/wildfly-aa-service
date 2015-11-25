@@ -64,7 +64,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.wildfly.security.auth.callback.ChannelBindingCallback;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 import org.wildfly.security.auth.client.ClientUtils;
 import org.wildfly.security.auth.client.MatchRule;
 import org.wildfly.security.credential.GSSCredentialCredential;
@@ -620,7 +620,7 @@ public class Gs2Test extends BaseTestCase {
     }
 
     private CallbackHandler createClientCallbackHandler(final String[] mechanisms, final String authorizationId, final GSSCredential credential) throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY

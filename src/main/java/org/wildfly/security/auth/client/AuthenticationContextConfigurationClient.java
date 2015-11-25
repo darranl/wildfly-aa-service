@@ -69,7 +69,7 @@ public final class AuthenticationContextConfigurationClient {
      * @param authenticationContext the authentication context to examine
      * @return the matching configuration
      */
-    public AuthenticationConfiguration getAuthenticationConfiguration(URI uri, AuthenticationContext authenticationContext) {
+    public AuthenticationConfiguration getAuthenticationConfiguration(URI uri, ClientAuthenticationContext authenticationContext) {
         final int idx = authenticationContext.ruleMatching(uri);
         if (idx == -1) return AuthenticationConfiguration.EMPTY;
         return authenticationContext.getAuthenticationConfiguration(idx);

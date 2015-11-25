@@ -35,7 +35,7 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 
 import org.wildfly.security.auth.callback.CredentialCallback;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
 import org.wildfly.security.credential.PasswordCredential;
 import org.wildfly.security.password.PasswordFactory;
@@ -65,12 +65,12 @@ public final class ElytronAuthenticator extends Authenticator {
 
     /**
      * Get the password authentication for this authenticator, which uses the current local
-     * {@linkplain AuthenticationContext authentication context} to log in to the remote server.
+     * {@linkplain ClientAuthenticationContext authentication context} to log in to the remote server.
      *
      * @return the authenticator
      */
     protected PasswordAuthentication getPasswordAuthentication() {
-        final AuthenticationContext context = AuthenticationContext.captureCurrent();
+        final ClientAuthenticationContext context = ClientAuthenticationContext.captureCurrent();
         final AuthenticationConfiguration authenticationConfiguration;
         try {
             authenticationConfiguration = client.getAuthenticationConfiguration(getRequestingURL().toURI(), context);

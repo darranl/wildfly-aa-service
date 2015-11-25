@@ -62,7 +62,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 import org.wildfly.security.auth.client.ClientUtils;
 import org.wildfly.security.auth.client.MatchRule;
 import org.wildfly.security.sasl.test.BaseTestCase;
@@ -595,7 +595,7 @@ public class EntityTest extends BaseTestCase {
 
     private CallbackHandler createClientCallbackHandler(final String[] mechanisms, final File keyStore, final String keyStoreAlias,
                                                         final char[] keyStorePassword, final X509TrustManager trustManager) throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY
@@ -609,7 +609,7 @@ public class EntityTest extends BaseTestCase {
 
     private CallbackHandler createClientCallbackHandler(final String[] mechanisms, final X509KeyManager keyManager,
                                                         final X509TrustManager trustManager) throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY
@@ -623,7 +623,7 @@ public class EntityTest extends BaseTestCase {
 
     private CallbackHandler createClientCallbackHandler(final String[] mechanisms, final PrivateKey privateKey, final X509Certificate[] certificateChain,
                                                         final X509TrustManager trustManager) throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY

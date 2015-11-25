@@ -37,7 +37,7 @@ import javax.security.sasl.SaslServerFactory;
 
 import org.junit.Test;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 import org.wildfly.security.auth.client.ClientUtils;
 import org.wildfly.security.auth.client.MatchRule;
 import org.wildfly.security.sasl.anonymous.AnonymousClientFactory;
@@ -155,7 +155,7 @@ public class AnonymousTest extends BaseTestCase {
     }
 
     private CallbackHandler createClientCallbackHandler() throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY

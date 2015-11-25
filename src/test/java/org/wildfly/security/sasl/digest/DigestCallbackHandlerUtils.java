@@ -27,7 +27,7 @@ import java.security.spec.KeySpec;
 import javax.security.auth.callback.CallbackHandler;
 
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.ClientAuthenticationContext;
 import org.wildfly.security.auth.client.ClientUtils;
 import org.wildfly.security.auth.client.MatchRule;
 import org.wildfly.security.password.Password;
@@ -57,7 +57,7 @@ public class DigestCallbackHandlerUtils {
     }
 
     private static CallbackHandler createClientCallbackHandler(final String username, final Password password, final String sentRealm) throws Exception {
-        final AuthenticationContext context = AuthenticationContext.empty()
+        final ClientAuthenticationContext context = ClientAuthenticationContext.empty()
                 .with(
                         MatchRule.ALL,
                         AuthenticationConfiguration.EMPTY
