@@ -26,6 +26,7 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import org.wildfly.common.context.ContextManager;
 import org.wildfly.common.context.Contextual;
@@ -48,21 +49,23 @@ public final class AuthenticationContext implements Contextual<AuthenticationCon
     }
 
     private final RuleConfigurationPair[] rules;
+    private final UnaryOperator<AuthenticationConfiguration> configurationOperator;
 
     private static final RuleConfigurationPair[] NO_RULES = new RuleConfigurationPair[0];
 
     static final AuthenticationContext EMPTY = new AuthenticationContext();
 
     private AuthenticationContext() {
-        this(NO_RULES, false);
+        this(NO_RULES, false, (ac) -> ac);
     }
 
-    AuthenticationContext(final RuleConfigurationPair[] rules, boolean clone) {
+    AuthenticationContext(final RuleConfigurationPair[] rules, boolean clone, final UnaryOperator<AuthenticationConfiguration> configurationOperator) {
         if (clone) {
             this.rules = rules.clone();
         } else {
             this.rules = rules;
         }
+        this.configurationOperator = configurationOperator;
     }
 
     /**
@@ -96,11 +99,11 @@ public final class AuthenticationContext implements Contextual<AuthenticationCon
         final RuleConfigurationPair[] rules = this.rules;
         final int length = rules.length;
         if (length == 0) {
-            return new AuthenticationContext(new RuleConfigurationPair[] { new RuleConfigurationPair(rule, configuration) }, false);
+            return new AuthenticationContext(new RuleConfigurationPair[] { new RuleConfigurationPair(rule, configuration) }, false, configurationOperator);
         } else {
             final RuleConfigurationPair[] copy = Arrays.copyOf(rules, length + 1);
             copy[length] = new RuleConfigurationPair(rule, configuration);
-            return new AuthenticationContext(copy, false);
+            return new AuthenticationContext(copy, false, configurationOperator);
         }
     }
 
@@ -124,7 +127,7 @@ public final class AuthenticationContext implements Contextual<AuthenticationCon
         }
         final RuleConfigurationPair[] copy = Arrays.copyOf(rules, length + otherLength);
         System.arraycopy(otherRules, 0, copy, length, otherLength);
-        return new AuthenticationContext(copy, false);
+        return new AuthenticationContext(copy, false, configurationOperator);
     }
 
     /**
@@ -145,12 +148,12 @@ public final class AuthenticationContext implements Contextual<AuthenticationCon
             throw new IndexOutOfBoundsException();
         }
         if (length == 0) {
-            return new AuthenticationContext(new RuleConfigurationPair[] { new RuleConfigurationPair(rule, configuration) }, false);
+            return new AuthenticationContext(new RuleConfigurationPair[] { new RuleConfigurationPair(rule, configuration) }, false, configurationOperator);
         } else {
             final RuleConfigurationPair[] copy = Arrays.copyOf(rules, length + 1);
             System.arraycopy(copy, idx, copy, idx + 1, length - idx);
             copy[idx] = new RuleConfigurationPair(rule, configuration);
-            return new AuthenticationContext(copy, false);
+            return new AuthenticationContext(copy, false, configurationOperator);
         }
     }
 
@@ -173,7 +176,7 @@ public final class AuthenticationContext implements Contextual<AuthenticationCon
         }
         final RuleConfigurationPair[] copy = rules.clone();
         copy[idx] = new RuleConfigurationPair(rule, configuration);
-        return new AuthenticationContext(copy, false);
+        return new AuthenticationContext(copy, false, configurationOperator);
     }
 
     /**
@@ -203,7 +206,7 @@ public final class AuthenticationContext implements Contextual<AuthenticationCon
             final RuleConfigurationPair[] copy = Arrays.copyOf(rules, length + otherLength);
             System.arraycopy(copy, idx, copy, idx + otherLength, length - idx);
             System.arraycopy(otherRules, 0, copy, idx, otherLength);
-            return new AuthenticationContext(copy, false);
+            return new AuthenticationContext(copy, false, configurationOperator);
         }
     }
 
@@ -234,7 +237,12 @@ public final class AuthenticationContext implements Contextual<AuthenticationCon
             copy = Arrays.copyOfRange(rules, 0, length - 1);
             System.arraycopy(rules, idx + 1, copy, idx, length - idx - 1);
         }
-        return new AuthenticationContext(copy, false);
+        return new AuthenticationContext(copy, false, configurationOperator);
+    }
+
+    public AuthenticationContext with(final UnaryOperator<AuthenticationConfiguration> configurationOperator) {
+        UnaryOperator<AuthenticationConfiguration> combined = (ac) -> configurationOperator.apply(this.configurationOperator.apply(ac));
+        return new AuthenticationContext(rules, true, combined);
     }
 
     int ruleMatching(URI uri) {
@@ -259,7 +267,7 @@ public final class AuthenticationContext implements Contextual<AuthenticationCon
         if (idx < 0 || idx >= length) {
             throw new IndexOutOfBoundsException();
         }
-        return rules[idx].getConfiguration();
+        return configurationOperator.apply(rules[idx].getConfiguration());
     }
 
     /**
