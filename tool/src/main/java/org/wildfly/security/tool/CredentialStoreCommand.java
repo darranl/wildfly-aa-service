@@ -20,6 +20,7 @@ package org.wildfly.security.tool;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,6 +30,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -40,6 +44,7 @@ import org.apache.commons.cli.Options;
 import org.wildfly.security.auth.server.IdentityCredentials;
 import org.wildfly.security.credential.Credential;
 import org.wildfly.security.credential.PasswordCredential;
+import org.wildfly.security.credential.SecretKeyCredential;
 import org.wildfly.security.credential.store.CredentialStore;
 import org.wildfly.security.credential.store.impl.KeyStoreCredentialStore;
 import org.wildfly.security.password.interfaces.ClearPassword;
@@ -48,6 +53,7 @@ import org.wildfly.security.password.interfaces.ClearPassword;
  * Credential Store Command
  * Performs credential store related operations.
  * @author <a href="mailto:pskopek@redhat.com">Peter Skopek</a>
+ * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
 class CredentialStoreCommand extends Command {
 
@@ -75,8 +81,12 @@ class CredentialStoreCommand extends Command {
     public static final String OTHER_PROVIDERS_PARAM = "other-providers";
     public static final String DEBUG_PARAM = "debug";
     public static final String CUSTOM_CREDENTIAL_STORE_PROVIDER_PARAM = "credential-store-provider";
+    public static final String GENERATE_SECRET_KEY = "generate-secret-key";
+    public static final String SIZE = "size";
+    public static final String EXPORT_SECRET_KEY = "export-secret-key";
     private static final List<String> filebasedKeystoreTypes = Collections.unmodifiableList(Arrays.asList("JKS", "JCEKS", "PKCS12"));
 
+    private static final String SECRET_KEY_ALGORITHM = "AES";
 
     private final Options options;
     private CommandLineParser parser = new DefaultParser();
@@ -116,8 +126,14 @@ class CredentialStoreCommand extends Command {
         opt.setArgName("type");
         options.addOption(opt);
         options.addOption("f", PRINT_SUMMARY_PARAM, false, ElytronToolMessages.msg.cmdLinePrintSummary());
+        options.addOption(Option.builder()
+                .longOpt(SIZE)
+                .hasArg()
+                .argName("size")
+                .desc(ElytronToolMessages.msg.keySize())
+                .build());
 
-        OptionGroup og = new OptionGroup();
+        OptionGroup og = new OptionGroup(); // Mutually Exclusive Options
         Option a = new Option("a", ADD_ALIAS_PARAM, true, ElytronToolMessages.msg.cmdLineAddAliasDesc());
         a.setArgName("alias");
         Option e = new Option("e", CHECK_ALIAS_PARAM, true, ElytronToolMessages.msg.cmdLineCheckAliasDesc());
@@ -125,12 +141,25 @@ class CredentialStoreCommand extends Command {
         Option r = new Option("r", REMOVE_ALIAS_PARAM, true, ElytronToolMessages.msg.cmdLineRemoveAliasDesc());
         r.setArgName("alias");
         Option v = new Option("v", ALIASES_PARAM, false, ElytronToolMessages.msg.cmdLineAliasesDesc());
-        Option h = new Option("h", HELP_PARAM, false, ElytronToolMessages.msg.cmdLineHelp());
-        Option d = new Option("d", DEBUG_PARAM, false, ElytronToolMessages.msg.cmdLineDebug());
         og.addOption(a);
         og.addOption(e);
         og.addOption(r);
         og.addOption(v);
+        og.addOption(Option.builder()
+                .longOpt(GENERATE_SECRET_KEY)
+                .hasArg()
+                .argName("alias")
+                .desc(ElytronToolMessages.msg.generateSecretKey())
+                .build());
+        og.addOption(Option.builder()
+                .longOpt(EXPORT_SECRET_KEY)
+                .hasArg()
+                .argName("alias")
+                .desc(ElytronToolMessages.msg.generateSecretKey())
+                .build());
+
+        Option h = new Option("h", HELP_PARAM, false, ElytronToolMessages.msg.cmdLineHelp());
+        Option d = new Option("d", DEBUG_PARAM, false, ElytronToolMessages.msg.cmdLineDebug());
         options.addOptionGroup(og);
         options.addOption(h);
         options.addOption(d);
@@ -169,6 +198,7 @@ class CredentialStoreCommand extends Command {
         }
         boolean printSummary = cmdLine.hasOption(PRINT_SUMMARY_PARAM);
         String secret = cmdLine.getOptionValue(PASSWORD_CREDENTIAL_VALUE_PARAM);
+        int size = getArgumentAsInt(cmdLine.getOptionValue(SIZE), 256);
 
         Map<String, String> implProps = parseCredentialStoreProperties(cmdLine.getOptionValue(IMPLEMENTATION_PROPERTIES_PARAM));
 
@@ -238,7 +268,6 @@ class CredentialStoreCommand extends Command {
                 }
             }
 
-
             credentialStore.store(alias, createCredential(secret, entryType));
             credentialStore.flush();
             if (entryType != null) {
@@ -249,8 +278,9 @@ class CredentialStoreCommand extends Command {
             setStatus(ElytronTool.ElytronToolExitStatus_OK);
         } else if (cmdLine.hasOption(REMOVE_ALIAS_PARAM)) {
             String alias = cmdLine.getOptionValue(REMOVE_ALIAS_PARAM);
-            if (credentialStore.exists(alias, entryTypeToCredential(entryType))) {
-                credentialStore.remove(alias, entryTypeToCredential(entryType));
+            Class<? extends Credential> credClazz = entryTypeToCredential(entryType);
+            if (credentialStore.exists(alias, credClazz)) {
+                credentialStore.remove(alias, credClazz);
                 credentialStore.flush();
                 if (entryType != null) {
                     System.out.println(ElytronToolMessages.msg.aliasRemoved(alias, entryType));
@@ -292,8 +322,26 @@ class CredentialStoreCommand extends Command {
                 System.out.println(ElytronToolMessages.msg.noAliases());
             }
             setStatus(ElytronTool.ElytronToolExitStatus_OK);
+        } else if (cmdLine.hasOption(GENERATE_SECRET_KEY)) {
+            String alias = cmdLine.getOptionValue(GENERATE_SECRET_KEY);
+            if (alias.length() == 0) {
+                setStatus(GENERAL_CONFIGURATION_ERROR);
+                throw ElytronToolMessages.msg.optionNotSpecified(ADD_ALIAS_PARAM);
+            }
+
+            SecretKey secretKey = generateSecretKey(size);
+
+            credentialStore.store(alias, createCredential(secretKey, entryType));
+            credentialStore.flush();
+            if (entryType != null) {
+                System.out.println(ElytronToolMessages.msg.aliasStored(alias, entryType));
+            } else {
+                System.out.println(ElytronToolMessages.msg.aliasStored(alias));
+            }
+            setStatus(ElytronTool.ElytronToolExitStatus_OK);
         } else if (cmdLine.hasOption(CREATE_CREDENTIAL_STORE_PARAM)) {
-            //this must be always the last available option.
+            //this must be always the last available option as it is not contained within the
+            // OptionGroup so could be combined with another command or specified on it's own.
             credentialStore.flush();
             System.out.println(ElytronToolMessages.msg.credentialStoreCreated());
             setStatus(ElytronTool.ElytronToolExitStatus_OK);
@@ -335,17 +383,43 @@ class CredentialStoreCommand extends Command {
         }
     }
 
+    private SecretKey generateSecretKey(int keySize) throws Exception {
+        if (keySize != 128 && keySize != 192 && keySize != 256) {
+            setStatus(GENERAL_CONFIGURATION_ERROR);
+            throw ElytronToolMessages.msg.badKeySize();
+        }
+
+        SecureRandom random = new SecureRandom();
+        final byte[] rawKey = new byte[keySize / 8];
+        random.nextBytes(rawKey);
+
+        SecretKey secretKey = new SecretKeySpec(rawKey, SECRET_KEY_ALGORITHM);
+        Arrays.fill(rawKey, (byte) 0);
+
+        return secretKey;
+    }
+
     private Credential createCredential(final String secret, String entryType) {
-        if (entryType == null || PasswordCredential.class.getName().equals(entryType)) {
+        if (entryType == null || PasswordCredential.class.getSimpleName().equals(entryType) || PasswordCredential.class.getName().equals(entryType)) {
             return new PasswordCredential(ClearPassword.createRaw(ClearPassword.ALGORITHM_CLEAR, secret.toCharArray()));
         } else {
             throw ElytronToolMessages.msg.unknownEntryType(entryType);
         }
     }
 
+    private Credential createCredential(final SecretKey secretKey, String entryType) {
+        if (entryType == null || SecretKeyCredential.class.getSimpleName().equals(entryType) || SecretKeyCredential.class.getName().equals(entryType)) {
+            return new SecretKeyCredential(secretKey);
+        } else {
+            throw ElytronToolMessages.msg.unknownEntryType(entryType);
+        }
+    }
+
     private Class<? extends Credential> entryTypeToCredential(String entryType) {
-        if (entryType == null || PasswordCredential.class.getName().equals(entryType)) {
+        if (entryType == null || PasswordCredential.class.getSimpleName().equals(entryType) || PasswordCredential.class.getName().equals(entryType)) {
             return PasswordCredential.class;
+        } else if (SecretKeyCredential.class.getSimpleName().equals(entryType) || SecretKeyCredential.class.getName().equals(entryType)) {
+            return SecretKeyCredential.class;
         } else {
             throw ElytronToolMessages.msg.unknownEntryType(entryType);
         }
@@ -407,6 +481,10 @@ class CredentialStoreCommand extends Command {
     }
 
     private int getArgumentAsInt(String argument) throws Exception {
+        return getArgumentAsInt(argument, -1);
+    }
+
+    private int getArgumentAsInt(String argument, int defaultValue) throws Exception {
         if (argument != null && !argument.isEmpty()) {
             try {
                 return Integer.parseInt(argument);
@@ -415,7 +493,7 @@ class CredentialStoreCommand extends Command {
                 throw new Exception(e);
             }
         }
-        return -1;
+        return defaultValue;
     }
 
     static void getCreateSummary(Map<String, String> implProps, StringBuilder com, String password) {

@@ -392,4 +392,14 @@ public interface ElytronToolMessages extends BasicLogger {
 
     @Message(id = NONE, value = "Should file %s be overwritten? (y/n) ")
     String shouldFileBeOverwritten(String file);
+
+    @Message(id = NONE, value = "Key size (bits).")
+    String keySize();
+
+    @Message(id = NONE, value = "Generate a new SecretKey and store it in the credential store.")
+    String generateSecretKey();
+
+    @Message(id = 29, value = "Invalid size value. Must be one of 128, 192, or 256")
+    IllegalArgumentException badKeySize();
+
 }
