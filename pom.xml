@@ -57,6 +57,7 @@
     <properties>
         <jdk.min.version>11</jdk.min.version>
         <version.commons-cli>1.4</version.commons-cli>
+        <version.io.smallrye.context-propagation>1.0.13-SNAPSHOT</version.io.smallrye.context-propagation>
         <version.io.smallrye.jwt>2.0.13</version.io.smallrye.jwt>
         <version.jakarta.enterprise>2.0.2</version.jakarta.enterprise>
         <version.org.apache.commons>3.8.1</version.org.apache.commons>
@@ -65,7 +66,9 @@
         <version.org.apache.directory.jdbm>2.0.0-M3</version.org.apache.directory.jdbm>
         <version.org.apache.directory.mavibot>1.0.0-M8</version.org.apache.directory.mavibot>
         <version.org.bouncycastle>1.64</version.org.bouncycastle>
-        <version.org.eclipse.microprofile.jwt.api>1.1.1</version.org.eclipse.microprofile.jwt.api>
+        
+        <version.org.eclipse.microprofile.context-propagation.api>1.1-SNAPSHOT</version.org.eclipse.microprofile.context-propagation.api>
+        <version.org.eclipse.microprofile.jwt.api>1.1.1</version.org.eclipse.microprofile.jwt.api>        
 
         <version.org.jboss.logging>3.4.1.Final</version.org.jboss.logging>
         <version.org.jboss.logmanager>2.1.14.Final</version.org.jboss.logmanager>
@@ -830,8 +833,14 @@
                 <scope>provided</scope>
             </dependency>
             <dependency>
-                <artifactId>smallrye-jwt</artifactId>
                 <groupId>io.smallrye</groupId>
+                <artifactId>smallrye-context-propagation-api</artifactId>
+                <version>${version.io.smallrye.context-propagation}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.smallrye</groupId>
+                <artifactId>smallrye-jwt</artifactId>
                 <version>${version.io.smallrye.jwt}</version>
                 <scope>provided</scope>
             </dependency>
@@ -839,6 +848,12 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>${version.org.apache.commons}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.microprofile.context-propagation</groupId>
+                <artifactId>microprofile-context-propagation-api</artifactId>
+                <version>${version.org.eclipse.microprofile.context-propagation.api}</version>
+                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.microprofile.jwt</groupId>
