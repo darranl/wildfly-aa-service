@@ -19,9 +19,9 @@
 package org.wildfly.security.mp.propagation;
 
 import java.security.AccessController;
-import java.security.PrivilegedAction;
+import java.security.PrivilegedExceptionAction;
 import java.util.Map;
-import java.util.function.Supplier;
+import java.util.concurrent.Callable;
 
 import javax.security.auth.Subject;
 
@@ -76,8 +76,8 @@ public class SubjectThreadContextProvider implements ThreadContextProvider {
         }
 
         @Override
-        public <T> Supplier<T> wrap(Supplier<T> task) {
-            return () -> Subject.doAs(subject, (PrivilegedAction<T>) task::get);
+        public <T> Callable<T> wrap(Callable<T> task) {
+            return () -> Subject.doAs(subject, (PrivilegedExceptionAction<T>) task::call);
         }
 
     }
