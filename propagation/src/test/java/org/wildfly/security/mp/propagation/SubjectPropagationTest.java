@@ -63,6 +63,9 @@ public class SubjectPropagationTest {
         Subject.doAs(subject, (PrivilegedExceptionAction<Void>) () -> {
             Future<String> result = executor.submit(() -> {
                 Subject propagatedSubject = Subject.getSubject(AccessController.getContext());
+                if (propagatedSubject == null) {
+                    return null;
+                }
                 Set<Principal> principals = propagatedSubject.getPrincipals();
                 return principals.iterator().next().getName();
             });
