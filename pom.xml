@@ -57,6 +57,7 @@
     <properties>
         <jdk.min.version>11</jdk.min.version>
         <version.commons-cli>1.4</version.commons-cli>
+        <version.io.smallrye.config>1.6.2</version.io.smallrye.config>
         <version.io.smallrye.context-propagation>1.0.13-SNAPSHOT</version.io.smallrye.context-propagation>
         <version.io.smallrye.jwt>2.0.13</version.io.smallrye.jwt>
         <version.jakarta.enterprise>2.0.2</version.jakarta.enterprise>
@@ -955,6 +956,18 @@
             <!--
                   Test Scope Only
              -->
+            <dependency>
+                <groupId>io.smallrye.config</groupId>
+                <artifactId>smallrye-config</artifactId>
+                <version>${version.io.smallrye.config}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.smallrye</groupId>
+                <artifactId>smallrye-context-propagation</artifactId>
+                <version>${version.io.smallrye.context-propagation}</version>
+                <scope>test</scope>
+            </dependency>
             <dependency>
                 <groupId>org.apache.directory.api</groupId>
                 <artifactId>api-asn1-api</artifactId>
