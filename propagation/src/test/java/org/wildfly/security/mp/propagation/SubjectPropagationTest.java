@@ -25,7 +25,8 @@ import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import javax.security.auth.Subject;
@@ -34,6 +35,8 @@ import org.eclipse.microprofile.context.ManagedExecutor;
 import org.junit.Test;
 import org.wildfly.security.auth.principal.NamePrincipal;
 
+import io.smallrye.context.SmallRyeManagedExecutor;
+
 /**
  * Test case to test the correct propagation of a {@link Subject}.
  *
@@ -41,33 +44,34 @@ import org.wildfly.security.auth.principal.NamePrincipal;
  */
 public class SubjectPropagationTest {
 
-    private static final String PRINCIPAL_NAME = "TestUser";
-
     @Test
     public void testPropagation() throws PrivilegedActionException {
-        Subject subject = new Subject();
-        subject.getPrincipals().add(new NamePrincipal(PRINCIPAL_NAME));
+        ExecutorService executorService = Executors.newFixedThreadPool(1);
+        executorService.execute(() -> {});  // Ensure the Thread is created before we associate a Subject with this one.
 
-        Subject.doAs(subject, (PrivilegedExceptionAction<Void>) () -> {
-            subjectPropagation();
-            return null;
-        });
-    }
-
-    public void subjectPropagation() throws InterruptedException, ExecutionException {
-        ManagedExecutor executor = ManagedExecutor.builder()
+        ManagedExecutor executor = ((SmallRyeManagedExecutor.Builder) ManagedExecutor.builder())
+                                       .withExecutorService(executorService)
+                                       .maxAsync(1)
+                                       .maxQueued(1)
                                        .propagated("Subject")
                                        .build();
 
-        Future<String> result = executor.submit(() -> {
-            Subject subject = Subject.getSubject(AccessController.getContext());
-            Set<Principal> principals = subject.getPrincipals();
-            return principals.iterator().next().getName();
+        String testPrincipalName = "TestUser";
+        Subject subject = new Subject();
+        subject.getPrincipals().add(new NamePrincipal(testPrincipalName));
+
+        Subject.doAs(subject, (PrivilegedExceptionAction<Void>) () -> {
+            Future<String> result = executor.submit(() -> {
+                Subject propagatedSubject = Subject.getSubject(AccessController.getContext());
+                Set<Principal> principals = propagatedSubject.getPrincipals();
+                return principals.iterator().next().getName();
+            });
+            assertEquals("Expected Principal Name", testPrincipalName, result.get());
+            return null;
         });
-        assertEquals("Expected Principal Name", PRINCIPAL_NAME, result.get());
 
         executor.shutdown();
+        executorService.shutdown();
     }
-
 
 }
