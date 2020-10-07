@@ -22,7 +22,7 @@ import static javax.xml.stream.XMLStreamConstants.END_ELEMENT;
 import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
 import static org.wildfly.common.Assert.checkMinimumParameter;
 import static org.wildfly.common.Assert.checkNotNullParam;
-import static org.wildfly.security.auth.client.ElytronMessages.xmlLog;
+import static org.wildfly.security.auth.client._private.ElytronMessages.xmlLog;
 import static org.wildfly.security.provider.util.ProviderUtil.INSTALLED_PROVIDERS;
 import static org.wildfly.security.provider.util.ProviderUtil.findProvider;
 
@@ -86,14 +86,18 @@ import org.wildfly.common.iteration.CodePointIterator;
 import org.wildfly.security.FixedSecurityFactory;
 import org.wildfly.security.SecurityFactory;
 import org.wildfly.security.asn1.OidsUtil;
+import org.wildfly.security.auth.client._private.ElytronMessages;
 import org.wildfly.security.auth.server.IdentityCredentials;
 import org.wildfly.security.auth.server.NameRewriter;
 import org.wildfly.security.auth.util.ElytronAuthenticator;
+import org.wildfly.security.auth.util.ElytronFilePasswordProvider;
 import org.wildfly.security.auth.util.RegexNameRewriter;
 import org.wildfly.security.credential.BearerTokenCredential;
+import org.wildfly.security.credential.Credential;
 import org.wildfly.security.credential.KeyPairCredential;
 import org.wildfly.security.credential.PasswordCredential;
 import org.wildfly.security.credential.PublicKeyCredential;
+import org.wildfly.security.credential.SSHCredential;
 import org.wildfly.security.credential.X509CertificateChainPrivateCredential;
 import org.wildfly.security.credential.source.CredentialSource;
 import org.wildfly.security.credential.source.impl.CredentialStoreCredentialSource;
@@ -146,7 +150,9 @@ public final class ElytronXmlParser {
         VERSION_1_1("urn:elytron:client:1.1", VERSION_1_0_1),
         VERSION_1_2("urn:elytron:client:1.2", VERSION_1_1),
         VERSION_1_3("urn:elytron:client:1.3", VERSION_1_2),
-        VERSION_1_4("urn:elytron:client:1.4", VERSION_1_3);
+        VERSION_1_4("urn:elytron:client:1.4", VERSION_1_3),
+        VERSION_1_5("urn:elytron:client:1.5", VERSION_1_4),
+        VERSION_1_6("urn:elytron:client:1.6", VERSION_1_5);
 
         final String namespace;
 
@@ -472,7 +478,7 @@ public final class ElytronXmlParser {
                     case "cipher-suite": {
                         if (isSet(foundBits, 1)) throw reader.unexpectedElement();
                         foundBits = setBit(foundBits, 1);
-                        cipherSuiteSelector = parseCipherSuiteSelectorType(reader);
+                        cipherSuiteSelector = parseCipherSuiteSelectorType(reader, xmlVersion);
                         break;
                     }
                     case "protocol": {
@@ -1242,6 +1248,13 @@ public final class ElytronXmlParser {
                         xmlLog.xmlDeprecatedElement(reader.getLocalName(), reader.getLocation());
                         break;
                     }
+                    case "webservices": {
+                        if (isSet(foundBits, 14)) throw reader.unexpectedElement();
+                        foundBits = setBit(foundBits, 14);
+                        Map<String, ?> webServices = parseWebServicesType(reader, xmlVersion);
+                        configuration = andThenOp(configuration, parentConfig -> parentConfig.useWebServices(webServices));
+                        break;
+                    }
                     default: {
                         throw reader.unexpectedElement();
                     }
@@ -1289,6 +1302,45 @@ public final class ElytronXmlParser {
                 }
             } else if (tag == END_ELEMENT) {
                 return providerSupplier;
+            } else {
+                throw reader.unexpectedContent();
+            }
+        }
+        throw reader.unexpectedDocumentEnd();
+    }
+
+    static Map<String, ?> parseWebServicesType(ConfigurationXMLStreamReader reader, final Version xmlVersion) throws ConfigXMLParseException {
+        requireNoAttributes(reader);
+
+        int foundBits = 0;
+        if (! reader.hasNext()) {
+            throw reader.unexpectedDocumentEnd();
+        }
+        Map<String, String> propertiesMap = new HashMap<>();
+
+        while (reader.hasNext()) {
+            final int tag = reader.nextTag();
+            if (tag == START_ELEMENT) {
+                checkElementNamespace(reader, xmlVersion);
+                switch (reader.getLocalName()) {
+                    case "set-http-mechanism": {
+                        if (isSet(foundBits, 0)) throw reader.unexpectedElement();
+                        foundBits = setBit(foundBits, 0);
+                        final String httpMechName = parseNameType(reader);
+                        propertiesMap.put("http-mechanism", httpMechName);
+                        break;
+                    }
+                    case "set-ws-security-type": {
+                        if (isSet(foundBits, 1)) throw reader.unexpectedElement();
+                        foundBits = setBit(foundBits, 1);
+                        final String wsSecurityType = parseNameType(reader);
+                        propertiesMap.put("ws-security-type", wsSecurityType);
+                        break;
+                    }
+                    default: throw reader.unexpectedElement();
+                }
+            } else if (tag == END_ELEMENT) {
+                return propertiesMap;
             } else {
                 throw reader.unexpectedContent();
             }
@@ -1453,8 +1505,8 @@ public final class ElytronXmlParser {
                         break;
                     }
                     case "key-pair": {
-                        KeyPair keyPair = parseKeyPair(reader, xmlVersion);
-                        function = andThenOp(function, credentialSource -> credentialSource.with(IdentityCredentials.NONE.withCredential(new KeyPairCredential(keyPair))));
+                        KeyPairCredential keyPairCredential = parseKeyPair(reader, xmlVersion, credentialStoresMap, providers);
+                        function = andThenOp(function, credentialSource -> credentialSource.with(IdentityCredentials.NONE.withCredential(keyPairCredential)));
                         break;
                     }
                     case "certificate": {
@@ -1486,6 +1538,14 @@ public final class ElytronXmlParser {
                         xmlLog.xmlDeprecatedElement(reader.getLocalName(), reader.getLocation());
                         break;
                     }
+                    case "ssh-credential": {
+                        if ( ! xmlVersion.isAtLeast(Version.VERSION_1_6)) {
+                            throw reader.unexpectedElement();
+                        }
+                        SSHCredential sshCredential = parseSSHKeyLocationCredential(reader, xmlVersion, credentialStoresMap, providers);
+                        function = andThenOp(function, credentialSource -> credentialSource.with(credentialSource.with(IdentityCredentials.NONE.withCredential(sshCredential))));
+                        break;
+                    }
                     default: {
                         throw reader.unexpectedElement();
                     }
@@ -1501,23 +1561,109 @@ public final class ElytronXmlParser {
         throw reader.unexpectedDocumentEnd();
     }
 
-    private static KeyPair parseKeyPair(final ConfigurationXMLStreamReader reader, final Version xmlVersion) throws ConfigXMLParseException {
-        requireNoAttributes(reader);
+    private static SSHCredential parseSSHKeyLocationCredential(final ConfigurationXMLStreamReader reader, final Version xmlVersion, final Map<String, ExceptionSupplier<CredentialStore, ConfigXMLParseException>> credentialStoresMap, Supplier<Provider[]> providers) throws ConfigXMLParseException {
+        final int attributeCount = reader.getAttributeCount();
+        String sshDirectory = null;
+        String privateKeyIdentity = null;
+        Credential passphrase = null;
+        String knownHostsFile = null;
+        for (int i = 0; i < attributeCount; i ++) {
+            checkAttributeNamespace(reader, i);
+            switch (reader.getAttributeLocalName(i)) {
+                case "ssh-directory": {
+                    sshDirectory = reader.getAttributeValueResolved(i);
+                    break;
+                }
+                case "private-key-file": {
+                    privateKeyIdentity = reader.getAttributeValueResolved(i);
+                    break;
+                }
+                case "known-hosts-file": {
+                    knownHostsFile = reader.getAttributeValueResolved(i);
+                    break;
+                }
+                default: throw reader.unexpectedAttribute(i);
+            }
+        }
+        while (reader.hasNext()) {
+            final int tag = reader.nextTag();
+            if (tag == START_ELEMENT) {
+                checkElementNamespace(reader, xmlVersion);
+                switch (reader.getLocalName()) {
+                    case "credential-store-reference": {
+                        final ExceptionSupplier<CredentialSource, ConfigXMLParseException> supplier = parseCredentialStoreRefType(reader, credentialStoresMap);
+                        try {
+                            passphrase = supplier.get().getCredential(PasswordCredential.class);
+                        } catch (IOException cause) {
+                            throw xmlLog.couldNotObtainCredential();
+                        }
+                        break;
+                    }
+                    case "clear-password": {
+                        ExceptionSupplier<Password, ConfigXMLParseException> password = parseClearPassword(reader, providers);
+                        passphrase = new PasswordCredential(password.get());
+                        break;
+                    }
+                    case "masked-password": {
+                        final XMLLocation location = reader.getLocation();
+                        ExceptionSupplier<Password, ConfigXMLParseException> password = parseMaskedPassword(reader, providers);
+                        Password maskedPassword = password.get();
+                        Password finalPassword;
+                        try {
+                            final PasswordFactory passwordFactory = PasswordFactory.getInstance(maskedPassword.getAlgorithm(), providers);
+                            final ClearPasswordSpec spec = passwordFactory.getKeySpec(maskedPassword, ClearPasswordSpec.class);
+                            final char[] clearPassword = spec.getEncodedPassword();
+                            PasswordFactory clearPasswordFactory = PasswordFactory.getInstance(ClearPassword.ALGORITHM_CLEAR, providers);
+                            finalPassword = clearPasswordFactory.generatePassword(new ClearPasswordSpec(clearPassword)).castAs(ClearPassword.class);
+                        } catch (InvalidKeySpecException | NoSuchAlgorithmException cause) {
+                            throw xmlLog.xmlFailedToCreateCredential(location, cause);
+                        }
+                        passphrase = new PasswordCredential(finalPassword);
+                        break;
+                    }
+                    default: throw reader.unexpectedElement();
+                }
+
+            } else if (tag == END_ELEMENT) {
+                SSHCredential.Builder builder = SSHCredential.builder();
+                if (sshDirectory != null) builder.setSSHDirectory(sshDirectory);
+                if (privateKeyIdentity != null) builder.setPrivateKeyIdentity(privateKeyIdentity);
+                if (passphrase != null) builder.setPassphrase(passphrase);
+                if (knownHostsFile != null) builder.setKnownHostsFile(knownHostsFile);
+                return builder.build();
+            } else {
+                throw reader.unexpectedContent();
+            }
+        }
+        throw reader.unexpectedDocumentEnd();
+    }
+
+    private static KeyPairCredential parseKeyPair(final ConfigurationXMLStreamReader reader, final Version xmlVersion, final Map<String, ExceptionSupplier<CredentialStore, ConfigXMLParseException>> credentialStoresMap, Supplier<Provider[]> providers) throws ConfigXMLParseException {
         PrivateKey privateKey = null;
         PublicKey publicKey = null;
+        KeyPair keyPair = null;
+        final int attributeCount = reader.getAttributeCount();
         while (reader.hasNext()) {
             final int tag = reader.nextTag();
             if (tag == START_ELEMENT) {
                 checkElementNamespace(reader, xmlVersion);
                 switch (reader.getLocalName()) {
                     case "private-key-pem": {
-                        if (privateKey != null) throw reader.unexpectedElement();
+                        if (privateKey != null || keyPair != null) throw reader.unexpectedElement();
                         privateKey = parsePem(reader, PrivateKey.class);
                         break;
                     }
                     case "public-key-pem": {
-                        if (publicKey != null) throw reader.unexpectedElement();
+                        if (publicKey != null || keyPair != null) throw reader.unexpectedElement();
                         publicKey = parsePem(reader, PublicKey.class);
+                        break;
+                    }
+                    case "openssh-private-key": {
+                        if ( ! xmlVersion.isAtLeast(Version.VERSION_1_6)) {
+                            throw reader.unexpectedElement();
+                        }
+                        if (keyPair != null || privateKey != null || publicKey != null) throw reader.unexpectedElement();
+                        keyPair = parseOpenSSHKeyType(reader, xmlVersion, credentialStoresMap, providers);
                         break;
                     }
                     default: {
@@ -1525,9 +1671,82 @@ public final class ElytronXmlParser {
                     }
                 }
             } else if (tag == END_ELEMENT) {
-                if (privateKey == null) throw reader.missingRequiredElement(xmlVersion.namespace, "private-key-pem");
-                if (publicKey == null) throw reader.missingRequiredElement(xmlVersion.namespace, "public-key-pem");
-                return new KeyPair(publicKey, privateKey);
+                if (keyPair == null) {
+                    if (privateKey == null) throw reader.missingRequiredElement(xmlVersion.namespace, "private-key-pem");
+                    if (publicKey == null) throw reader.missingRequiredElement(xmlVersion.namespace, "public-key-pem");
+                    keyPair = new KeyPair(publicKey, privateKey);
+                }
+                return new KeyPairCredential(keyPair);
+            } else {
+                throw reader.unexpectedContent();
+            }
+        }
+        throw reader.unexpectedDocumentEnd();
+    }
+
+    private static KeyPair parseOpenSSHKeyType(final ConfigurationXMLStreamReader reader, final Version xmlVersion, final Map<String, ExceptionSupplier<CredentialStore, ConfigXMLParseException>> credentialStoresMap, Supplier<Provider[]> providers) throws ConfigXMLParseException {
+        final int attributeCount = reader.getAttributeCount();
+        ExceptionUnaryOperator<CredentialSource, ConfigXMLParseException> function = parent -> CredentialSource.NONE;
+        String keyContent = null;
+        for (int i = 0; i < attributeCount; i ++) {
+            checkAttributeNamespace(reader, i);
+            switch (reader.getAttributeLocalName(i)) {
+                case "pem": {
+                    if (keyContent != null) throw reader.unexpectedAttribute(i);
+                    keyContent = reader.getAttributeValueResolved(i);
+                    break;
+                }
+                default: throw reader.unexpectedAttribute(i);
+            }
+        }
+        while (reader.hasNext()) {
+            final int tag = reader.nextTag();
+            if (tag == START_ELEMENT) {
+                checkElementNamespace(reader, xmlVersion);
+                switch (reader.getLocalName()) {
+                    case "credential-store-reference": {
+                        final ExceptionSupplier<CredentialSource, ConfigXMLParseException> supplier = parseCredentialStoreRefType(reader, credentialStoresMap);
+                        function = andThenOp(function, credentialSource -> credentialSource.with(supplier.get()));
+                        break;
+                    }
+                    case "clear-password": {
+                        ExceptionSupplier<Password, ConfigXMLParseException> password = parseClearPassword(reader, providers);
+                        function = andThenOp(function, credentialSource -> credentialSource.with(IdentityCredentials.NONE.withCredential(new PasswordCredential(password.get()))));
+                        break;
+                    }
+                    case "masked-password": {
+                        if ( ! xmlVersion.isAtLeast(Version.VERSION_1_4)) {
+                            throw reader.unexpectedElement();
+                        }
+                        final XMLLocation location = reader.getLocation();
+                        ExceptionSupplier<Password, ConfigXMLParseException> password = parseMaskedPassword(reader, providers);
+                        Password maskedPassword = password.get();
+                        Password finalPassword;
+                        try {
+                            final PasswordFactory passwordFactory = PasswordFactory.getInstance(maskedPassword.getAlgorithm(), providers);
+                            final ClearPasswordSpec spec = passwordFactory.getKeySpec(maskedPassword, ClearPasswordSpec.class);
+                            final char[] clearPassword = spec.getEncodedPassword();
+                            PasswordFactory clearPasswordFactory = PasswordFactory.getInstance(ClearPassword.ALGORITHM_CLEAR, providers);
+                            finalPassword = clearPasswordFactory.generatePassword(new ClearPasswordSpec(clearPassword)).castAs(ClearPassword.class);
+                        } catch (InvalidKeySpecException | NoSuchAlgorithmException cause) {
+                            throw xmlLog.xmlFailedToCreateCredential(location, cause);
+                        }
+                        function = andThenOp(function, credentialSource -> credentialSource.with(IdentityCredentials.NONE.withCredential(new PasswordCredential(finalPassword))));
+                        break;
+                    }
+                    default: throw reader.unexpectedElement();
+                }
+
+            } else if (tag == END_ELEMENT) {
+                if (keyContent == null) throw reader.missingRequiredAttribute(reader.getNamespaceURI(), "openssh-private-key");
+                final ExceptionUnaryOperator<CredentialSource, ConfigXMLParseException> finalFunction = function;
+                ElytronFilePasswordProvider passwordProvider = new ElytronFilePasswordProvider(()->finalFunction.apply(null));
+                Iterator<PemEntry<?>> pemContent = Pem.parsePemOpenSSHContent(CodePointIterator.ofString(keyContent), passwordProvider);
+                final PemEntry<?> pemEntry = pemContent.next();
+                final KeyPair keyPair = pemEntry.tryCast(KeyPair.class);
+                if (keyPair == null) throw xmlLog.xmlInvalidOpenSSHKey(reader);
+                return keyPair;
+
             } else {
                 throw reader.unexpectedContent();
             }
@@ -2570,26 +2789,38 @@ public final class ElytronXmlParser {
      * @return the parsed cipher suite selector
      * @throws ConfigXMLParseException if the resource failed to be parsed
      */
-    static CipherSuiteSelector parseCipherSuiteSelectorType(ConfigurationXMLStreamReader reader) throws ConfigXMLParseException {
+    static CipherSuiteSelector parseCipherSuiteSelectorType(ConfigurationXMLStreamReader reader, Version xmlVersion) throws ConfigXMLParseException {
         final int attributeCount = reader.getAttributeCount();
         CipherSuiteSelector selector = null;
+        CipherSuiteSelector names = null;
         for (int i = 0; i < attributeCount; i ++) {
             checkAttributeNamespace(reader, i);
             if (reader.getAttributeLocalName(i).equals("selector")) {
                 selector = CipherSuiteSelector.fromString(reader.getAttributeValueResolved(i));
+            } else if (xmlVersion.isAtLeast(Version.VERSION_1_5) && reader.getAttributeLocalName(i).equals("names")) {
+                names = CipherSuiteSelector.fromNamesString(reader.getAttributeValueResolved(i));
             } else {
                 throw reader.unexpectedAttribute(i);
             }
         }
-        if (selector == null) {
+        if (selector == null && ! xmlVersion.isAtLeast(Version.VERSION_1_5)) {
             throw missingAttribute(reader, "selector");
+        } else if (selector == null && names == null && xmlVersion.isAtLeast(Version.VERSION_1_5)) {
+            throw xmlLog.atLeastOneCipherSuiteAttributeMustBeProvided("selector", "names");
         }
+        if (selector == null) {
+            selector = CipherSuiteSelector.openSslDefault(); // default cipher suites pre TLSv1.3
+        }
+        // ELY-1917: The following lines should be added back when once we are ready to enable TLS 1.3 by default
+        /*if ((names == null) && xmlVersion.isAtLeast(Version.VERSION_1_5)) {
+            names = CipherSuiteSelector.openSslDefaultCipherSuites(); // default cipher suites for TLSv1.3
+        }*/
         if (reader.hasNext()) {
             final int tag = reader.nextTag();
             if (tag == START_ELEMENT) {
                 throw reader.unexpectedElement();
             } else if (tag == END_ELEMENT) {
-                return selector;
+                return CipherSuiteSelector.aggregate(names, selector);
             } else {
                 throw reader.unexpectedContent();
             }

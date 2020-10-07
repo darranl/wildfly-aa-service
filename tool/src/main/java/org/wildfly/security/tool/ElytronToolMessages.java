@@ -29,6 +29,8 @@ import org.jboss.logging.annotations.MessageLogger;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.security.InvalidParameterException;
+import java.security.NoSuchAlgorithmException;
 
 /**
  * Messages for Elytron tool.
@@ -95,28 +97,58 @@ public interface ElytronToolMessages extends BasicLogger {
             "Provider must be installed through java.security file or through service loader from properly packaged jar file on classpath.")
     String cmdLineCustomCredentialStoreProviderDesc();
 
-    @Message(id = NONE, value = "Create credential store")
+    @Message(id = NONE, value = "Create credential store (Action)")
     String cmdLineCreateCredentialStoreDesc();
 
     @Message(id = NONE, value = "Credential store type")
     String cmdLineCredentialStoreTypeDesc();
 
-    @Message(id = NONE, value = "Add new alias to the credential store")
+    @Message(id = NONE, value = "Add new alias to the credential store (Action)")
     String cmdLineAddAliasDesc();
 
-    @Message(id = NONE, value = "Remove alias from the credential store")
+    @Message(id = NONE, value = "Remove alias from the credential store (Action)")
     String cmdLineRemoveAliasDesc();
 
-    @Message(id = NONE, value = "Check if alias exists within the credential store")
+    @Message(id = NONE, value = "Check if alias exists within the credential store (Action)")
     String cmdLineCheckAliasDesc();
 
-    @Message(id = NONE, value = "Display all aliases")
+    @Message(id = NONE, value = "Display all aliases (Action)")
     String cmdLineAliasesDesc();
+
+    @Message(id = NONE, value = "Generate private and public key pair and store them as a KeyPairCredential")
+    String cmdLineGenerateKeyPairDesc();
+
+    @Message(id = NONE, value = "Size (number of bytes) of the keys when generating a KeyPairCredential.")
+    String cmdLineKeySizeDesc();
+
+    @Message(id = NONE, value = "Encryption algorithm to be used when generating a KeyPairCredential: RSA, DSA, or EC. Default RSA")
+    String cmdLineKeyAlgorithmDesc();
+
+    @Message(id = NONE, value = "Prints the public key stored under a KeyPairCredential as Base64 encoded String, in OpenSSH format.")
+    String cmdLineExportPublicKeyDesc();
+
+    @Message(id = NONE, value = "Import a KeyPairCredential into the credential store.")
+    String cmdLineImportKeyPairDesc();
+
+    @Message(id = NONE, value = "The location of a file containing a private key.")
+    String cmdLinePrivateKeyLocationDesc();
+
+    @Message(id = NONE, value = "The location of a file containing a public key.")
+    String cmdLinePublicKeyLocationDesc();
+
+    @Message(id = NONE, value = "The passphrase used to decrypt the private key.")
+    String cmdLineKeyPassphraseDesc();
+
+    @Message(id = NONE, value = "A private key specified as a String.")
+    String cmdLinePrivateKeyStringDesc();
+
+    @Message(id = NONE, value = "A public key specified as a String.")
+    String cmdLinePublicKeyStringDesc();
 
     @Message(id = NONE, value = "Print summary, especially command how to create this credential store")
     String cmdLinePrintSummary();
 
-    @Message(id = NONE, value = "Get help with usage of this command")
+    @Message(id = NONE, value = "Get help with usage of this command (Action)")
     String cmdLineHelp();
 
     @Message(id = NONE, value = "Alias \"%s\" exists")
@@ -157,6 +189,12 @@ public interface ElytronToolMessages extends BasicLogger {
 
     @Message(id = NONE, value = "Confirm credential store password: ")
     String credentialStorePasswordPromptConfirm();
+
+    @Message(id = NONE, value = "Passphrase to be used to decrypt private key (can be nothing if no passphrase was used to encrypt the key): ")
+    String keyPassphrasePrompt();
+
+    @Message(id = NONE, value = "Confirm passphrase to be used to decrypt private key (can be nothing if no passphrase was used to encrypt the key): ")
+    String keyPassphrasePromptConfirm();
 
     @Message(id = NONE, value = "Secret to store: ")
     String secretToStorePrompt();
@@ -226,7 +264,7 @@ public interface ElytronToolMessages extends BasicLogger {
     @Message(id = NONE, value = "CLI command to add new credential store:%n")
     String cliCommandToNewCredentialStore();
 
-    @Message(id = NONE, value = "Bulk conversion with options listed in description file. All options have no default value and should be set in the file.%n" +
+    @Message(id = NONE, value = "Bulk conversion with options listed in description file. All options have no default value and should be set in the file. (Action)%n" +
                                 "All options are required with the exceptions:%n" +
                                 " - \"properties\" option%n - \"type\" option (defaults to \"KeyStoreCredentialStore\")%n - \"credential-store-provider\" option%n - \"other-providers\" option%n" +
                                 " - \"salt\" and \"iteration\" options can be omitted when plain-text password is used%n" +
@@ -332,6 +370,24 @@ public interface ElytronToolMessages extends BasicLogger {
     @Message(id = 28, value = "Location parameter is not specified for filebased keystore type '%s'")
     MissingArgumentException filebasedKeystoreLocationMissing(String type);
 
+    @Message(id = 29, value = "Key Pair Algorithm: '%s' is not supported.")
+    NoSuchAlgorithmException unknownKeyPairAlgorithm(String algorithm);
+
+    @Message(id = 30, value = "Key file '%s' does not exist.")
+    IllegalArgumentException keyFileDoesNotExist(String location);
+
+    @Message(id = 31, value = "No private key specified for importing.")
+    MissingArgumentException noPrivateKeySpecified();
+
+    @Message(id = 32, value = "No public key specified for importing.")
+    MissingArgumentException noPublicKeySpecified();
+
+    @Message(id = 33, value = "No PEM content found")
+    MissingArgumentException xmlNoPemContent();
+
+    @Message(id = 34, value = "Invalid keysize provided: %s")
+    InvalidParameterException invalidKeySize(String reason);
+
     @Message(id = NONE, value = "In the message below, option '%s' refers to long option '%s'.")
     String longOptionDescription(String option, String longOption);
 
@@ -354,7 +410,7 @@ public interface ElytronToolMessages extends BasicLogger {
     @Message(id = NONE, value = "Name of the security-domain to be configured.")
     String cmdFileSystemRealmSecurityDomainNameDesc();
 
-    @Message(id = NONE, value = "Bulk conversion with options listed in description file. Optional options have default values, required options do not. %n" +
+    @Message(id = NONE, value = "Bulk conversion with options listed in description file. Optional options have default values, required options do not. (Action) %n" +
             "The options fileSystemRealmName and securityDomainName are optional. %n" +
             "These optional options have default values of: converted-properties-filesystem-realm and converted-properties-security-domain. %n" +
             "Values are required for the following options: users-file, roles-file, and output-location. %n" +
@@ -392,4 +448,7 @@ public interface ElytronToolMessages extends BasicLogger {
 
     @Message(id = NONE, value = "Should file %s be overwritten? (y/n) ")
     String shouldFileBeOverwritten(String file);
+
+    @Message(id = NONE, value = "\nSome of the parameters below are mutually exclusive actions which are marked with (Action) in the description.")
+    String cmdLineActionsHelpHeader();
 }

@@ -20,8 +20,10 @@ package org.wildfly.security.auth.server;
 
 import static org.wildfly.common.Assert.checkNotNullParam;
 import static org.wildfly.security.auth.server._private.ElytronMessages.log;
+import static org.wildfly.security.authz.RoleDecoder.KEY_SOURCE_ADDRESS;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.security.cert.X509Certificate;
@@ -73,7 +75,11 @@ import org.wildfly.security.auth.server.event.RealmIdentitySuccessfulAuthorizati
 import org.wildfly.security.auth.server.event.RealmSuccessfulAuthenticationEvent;
 import org.wildfly.security.auth.server.event.SecurityAuthenticationFailedEvent;
 import org.wildfly.security.auth.server.event.SecurityAuthenticationSuccessfulEvent;
+import org.wildfly.security.auth.server.event.SecurityRealmUnavailableEvent;
+import org.wildfly.security.authz.AggregateAttributes;
+import org.wildfly.security.authz.Attributes;
 import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.authz.MapAttributes;
 import org.wildfly.security.credential.Credential;
 import org.wildfly.security.credential.PasswordCredential;
 import org.wildfly.security.credential.source.CredentialSource;
@@ -310,7 +316,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
     }
 
     ServerAuthenticationContext(final SecurityIdentity capturedIdentity, final MechanismConfigurationSelector mechanismConfigurationSelector) {
-        stateRef = new AtomicReference<>(new InactiveState(capturedIdentity, mechanismConfigurationSelector, IdentityCredentials.NONE, IdentityCredentials.NONE));
+        stateRef = new AtomicReference<>(new InactiveState(capturedIdentity, mechanismConfigurationSelector, IdentityCredentials.NONE, IdentityCredentials.NONE, Attributes.EMPTY));
     }
 
     /**
@@ -793,6 +799,16 @@ public final class ServerAuthenticationContext implements AutoCloseable {
     }
 
     /**
+     * Add runtime attributes to the identity being authenticated.
+     *
+     * @param runtimeAttributes the runtime attributes to add (must not be {@code null})
+     */
+    public void addRuntimeAttributes(Attributes runtimeAttributes) {
+        Assert.checkNotNullParam("runtimeAttributes", runtimeAttributes);
+        stateRef.get().addRuntimeAttributes(runtimeAttributes);
+    }
+
+    /**
      * Attempt to import the given security identity as a trusted identity.  If this method returns {@code true},
      * the context will be in an authorized state, and the new identity can be retrieved.
      *
@@ -1039,7 +1055,9 @@ public final class ServerAuthenticationContext implements AutoCloseable {
                     final SocketAddressCallback socketAddressCallback = (SocketAddressCallback) callback;
                     log.tracef("Handling SocketAddressCallback");
                     if (socketAddressCallback.getKind() == SocketAddressCallback.Kind.PEER) {
-                        // todo: filter by IP address
+                        Attributes runtimeAttributes = new MapAttributes();
+                        runtimeAttributes.addFirst(KEY_SOURCE_ADDRESS, ((InetSocketAddress) socketAddressCallback.getAddress()).getAddress().getHostAddress());
+                        addRuntimeAttributes(runtimeAttributes);
                     }
                     handleOne(callbacks, idx + 1);
                 } else if (callback instanceof SecurityIdentityCallback) {
@@ -1151,28 +1169,28 @@ public final class ServerAuthenticationContext implements AutoCloseable {
         return realmName != null ? realmName : defaultRealmName;
     }
 
-    State assignName(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, Principal originalPrincipal, final Evidence evidence, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials) throws RealmUnavailableException {
-        return assignName(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, originalPrincipal, evidence, privateCredentials, publicCredentials, false);
+    State assignName(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, Principal originalPrincipal, final Evidence evidence, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) throws RealmUnavailableException {
+        return assignName(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, originalPrincipal, evidence, privateCredentials, publicCredentials, false, runtimeAttributes);
     }
 
-    State assignName(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, Principal originalPrincipal, final Evidence evidence, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final boolean exclusive) throws RealmUnavailableException {
+    State assignName(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, Principal originalPrincipal, final Evidence evidence, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final boolean exclusive, final Attributes runtimeAttributes) throws RealmUnavailableException {
         final SecurityDomain domain = capturedIdentity.getSecurityDomain();
         final Principal preRealmPrincipal = rewriteAll(originalPrincipal, mechanismRealmConfiguration.getPreRealmRewriter(), mechanismConfiguration.getPreRealmRewriter(), domain.getPreRealmRewriter());
         if (preRealmPrincipal == null) {
             log.tracef("Unable to rewrite principal [%s] by pre-realm rewritters", originalPrincipal);
-            return new InvalidNameState(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials);
+            return new InvalidNameState(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);
         }
         String realmName = mapAll(preRealmPrincipal, mechanismRealmConfiguration.getRealmMapper(), mechanismConfiguration.getRealmMapper(), domain.getRealmMapper(), domain.getDefaultRealmName());
         final RealmInfo realmInfo = domain.getRealmInfo(realmName);
         final Principal postRealmPrincipal = rewriteAll(preRealmPrincipal, mechanismRealmConfiguration.getPostRealmRewriter(), mechanismConfiguration.getPostRealmRewriter(), domain.getPostRealmRewriter());
         if (postRealmPrincipal == null) {
             log.tracef("Unable to rewrite principal [%s] by post-realm rewritters", preRealmPrincipal);
-            return new InvalidNameState(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials);
+            return new InvalidNameState(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);
         }
         final Principal finalPrincipal = rewriteAll(postRealmPrincipal, mechanismRealmConfiguration.getFinalRewriter(), mechanismConfiguration.getFinalRewriter(), realmInfo.getPrincipalRewriter());
         if (finalPrincipal == null) {
             log.tracef("Unable to rewrite principal [%s] by final rewritters", postRealmPrincipal);
-            return new InvalidNameState(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials);
+            return new InvalidNameState(capturedIdentity, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);
         }
 
         log.tracef("Principal assigning: [%s], pre-realm rewritten: [%s], realm name: [%s], post-realm rewritten: [%s], realm rewritten: [%s]",
@@ -1180,17 +1198,23 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         final SecurityRealm securityRealm = realmInfo.getSecurityRealm();
         final RealmIdentity realmIdentity;
-        if (exclusive) {
-            if (securityRealm instanceof ModifiableSecurityRealm) {
-                realmIdentity = ((ModifiableSecurityRealm) securityRealm).getRealmIdentityForUpdate(finalPrincipal);
+        try {
+            if (exclusive) {
+                if (securityRealm instanceof ModifiableSecurityRealm) {
+                    realmIdentity = ((ModifiableSecurityRealm) securityRealm).getRealmIdentityForUpdate(finalPrincipal);
+                } else {
+                    throw log.unableToObtainExclusiveAccess();
+                }
             } else {
-                throw log.unableToObtainExclusiveAccess();
+                realmIdentity = securityRealm.getRealmIdentity(finalPrincipal);
             }
-        } else {
-            realmIdentity = securityRealm.getRealmIdentity(finalPrincipal);
+        } catch (RealmUnavailableException e) {
+            SecurityDomain.safeHandleSecurityEvent(domain, new SecurityRealmUnavailableEvent(capturedIdentity, realmName));
+            throw e;
         }
 
-        return new NameAssignedState(capturedIdentity, realmInfo, realmIdentity, preRealmPrincipal, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials);
+
+        return new NameAssignedState(capturedIdentity, realmInfo, realmIdentity, preRealmPrincipal, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);
     }
 
     abstract static class State {
@@ -1290,6 +1314,10 @@ public final class ServerAuthenticationContext implements AutoCloseable {
             throw log.noAuthenticationInProgress();
         }
 
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+            throw log.noAuthenticationInProgress();
+        }
+
         /**
          * Indicate whether or not current state is {@link NameAssignedState}.
          *
@@ -1325,23 +1353,25 @@ public final class ServerAuthenticationContext implements AutoCloseable {
         private final MechanismInformation mechanismInformation;
         private final IdentityCredentials privateCredentials;
         private final IdentityCredentials publicCredentials;
+        private final Attributes runtimeAttributes;
 
-        public InactiveState(SecurityIdentity capturedIdentity, MechanismConfigurationSelector mechanismConfigurationSelector, IdentityCredentials privateCredentials, IdentityCredentials publicCredentials) {
-            this(capturedIdentity, mechanismConfigurationSelector, MechanismInformation.DEFAULT, privateCredentials, publicCredentials);
+        public InactiveState(SecurityIdentity capturedIdentity, MechanismConfigurationSelector mechanismConfigurationSelector, IdentityCredentials privateCredentials, IdentityCredentials publicCredentials, Attributes runtimeAttributes) {
+            this(capturedIdentity, mechanismConfigurationSelector, MechanismInformation.DEFAULT, privateCredentials, publicCredentials, runtimeAttributes);
         }
 
         public InactiveState(SecurityIdentity capturedIdentity, MechanismConfigurationSelector mechanismConfigurationSelector,
-                MechanismInformation mechanismInformation, IdentityCredentials privateCredentials, IdentityCredentials publicCredentials) {
+                MechanismInformation mechanismInformation, IdentityCredentials privateCredentials, IdentityCredentials publicCredentials, Attributes runtimeAttributes) {
             this.capturedIdentity = capturedIdentity;
             this.mechanismConfigurationSelector = mechanismConfigurationSelector;
             this.mechanismInformation = checkNotNullParam("mechanismInformation", mechanismInformation);
             this.privateCredentials = privateCredentials;
             this.publicCredentials = publicCredentials;
+            this.runtimeAttributes = runtimeAttributes;
         }
 
         @Override
         void setMechanismInformation(MechanismInformation mechanismInformation) {
-            InactiveState inactiveState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials);
+            InactiveState inactiveState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials, runtimeAttributes);
             InitialState nextState = inactiveState.selectMechanismConfiguration();
             if (! stateRef.compareAndSet(this, nextState)) {
                 stateRef.get().setMechanismInformation(mechanismInformation);
@@ -1420,7 +1450,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         @Override
         void addPublicCredential(final Credential credential) {
-            final InactiveState newState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials.withCredential(credential));
+            final InactiveState newState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials.withCredential(credential), runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().addPublicCredential(credential);
             }
@@ -1428,9 +1458,17 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         @Override
         void addPrivateCredential(final Credential credential) {
-            final InactiveState newState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials.withCredential(credential), publicCredentials);
+            final InactiveState newState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials.withCredential(credential), publicCredentials, runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().addPrivateCredential(credential);
+            }
+        }
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+            final InactiveState newState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials, AggregateAttributes.aggregateOf(this.runtimeAttributes, runtimeAttributes));
+            if (! stateRef.compareAndSet(this, newState)) {
+                stateRef.get().addRuntimeAttributes(runtimeAttributes);
             }
         }
 
@@ -1446,7 +1484,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
                         mechanismInformation.getMechanismName(), mechanismInformation.getHostName(),
                         mechanismInformation.getProtocol());
             }
-            return new InitialState(capturedIdentity, mechanismConfiguration, mechanismConfigurationSelector, privateCredentials, publicCredentials);
+            return new InitialState(capturedIdentity, mechanismConfiguration, mechanismConfigurationSelector, privateCredentials, publicCredentials, runtimeAttributes);
         }
 
     }
@@ -1462,7 +1500,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
             // get the identity we are authorizing from
             final SecurityIdentity sourceIdentity = getSourceIdentity();
 
-            final State state = assignName(sourceIdentity, getMechanismConfiguration(), getMechanismRealmConfiguration(), authorizationId, null, IdentityCredentials.NONE, IdentityCredentials.NONE);
+            final State state = assignName(sourceIdentity, getMechanismConfiguration(), getMechanismRealmConfiguration(), authorizationId, null, IdentityCredentials.NONE, IdentityCredentials.NONE, Attributes.EMPTY);
             if (!state.isNameAssigned()) {
                 ElytronMessages.log.tracef("Authorization failed - unable to assign identity name");
                 return false;
@@ -1529,12 +1567,14 @@ public final class ServerAuthenticationContext implements AutoCloseable {
         final MechanismConfiguration mechanismConfiguration;
         final IdentityCredentials privateCredentials;
         final IdentityCredentials publicCredentials;
+        final Attributes runtimeAttributes;
 
-        UnassignedState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials) {
+        UnassignedState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {
             this.capturedIdentity = capturedIdentity;
             this.mechanismConfiguration = mechanismConfiguration;
             this.privateCredentials = privateCredentials;
             this.publicCredentials = publicCredentials;
+            this.runtimeAttributes = runtimeAttributes;
         }
 
         SecurityIdentity getSourceIdentity() {
@@ -1601,7 +1641,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
             }
 
             // Finally, run the identity through the normal name selection process.
-            final State state = assignName(sourceIdentity, mechanismConfiguration, getMechanismRealmConfiguration(), importedPrincipal, null, privateCredentials, publicCredentials);
+            final State state = assignName(sourceIdentity, mechanismConfiguration, getMechanismRealmConfiguration(), importedPrincipal, null, privateCredentials, publicCredentials, runtimeAttributes);
             if (!state.isNameAssigned()) {
                 return false;
             }
@@ -1647,7 +1687,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
             log.tracef("Evidence verification: evidence = %s  evidencePrincipal = %s", evidence, evidencePrincipal);
             final MechanismRealmConfiguration mechanismRealmConfiguration = getMechanismRealmConfiguration();
             if (evidencePrincipal != null) {
-                final State newState = assignName(getSourceIdentity(), mechanismConfiguration, mechanismRealmConfiguration, evidencePrincipal, evidence, privateCredentials, publicCredentials);
+                final State newState = assignName(getSourceIdentity(), mechanismConfiguration, mechanismRealmConfiguration, evidencePrincipal, evidence, privateCredentials, publicCredentials, runtimeAttributes);
                 if (! newState.verifyEvidence(evidence)) {
                     if (newState.isNameAssigned()) {
                         ((NameAssignedState)newState).realmIdentity.dispose();
@@ -1671,16 +1711,25 @@ public final class ServerAuthenticationContext implements AutoCloseable {
             RealmIdentity realmIdentity = null;
             RealmInfo realmInfo = null;
             for (RealmInfo info : realmInfos) {
-                realmIdentity = info.getSecurityRealm().getRealmIdentity(evidence);
-                if (realmIdentity.getEvidenceVerifySupport(evidenceType, algorithm).mayBeSupported()) {
-                    realmInfo = info;
-                    break;
-                } else {
-                    realmIdentity.dispose();
+                try {
+                    realmIdentity = info.getSecurityRealm().getRealmIdentity(evidence);
+                    if (realmIdentity.getEvidenceVerifySupport(evidenceType, algorithm).mayBeSupported()) {
+                        realmInfo = info;
+                        break;
+                    } else {
+                        realmIdentity.dispose();
+                    }
+                } catch (RealmUnavailableException e) {
+                    SecurityDomain.safeHandleSecurityEvent(domain, new SecurityRealmUnavailableEvent(domain.getCurrentSecurityIdentity(), info.getName()));
+                    throw e;
                 }
             }
             if (realmInfo == null) {
                 // no verification possible, no identity found
+                return false;
+            }
+            if (! realmIdentity.verifyEvidence(evidence)) {
+                realmIdentity.dispose();
                 return false;
             }
             final Principal resolvedPrincipal = realmIdentity.getRealmIdentityPrincipal();
@@ -1689,11 +1738,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
                 realmIdentity.dispose();
                 return false;
             }
-            if (! realmIdentity.verifyEvidence(evidence)) {
-                realmIdentity.dispose();
-                return false;
-            }
-            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), realmInfo, realmIdentity, resolvedPrincipal, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials);
+            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), realmInfo, realmIdentity, resolvedPrincipal, mechanismConfiguration, mechanismRealmConfiguration, privateCredentials, publicCredentials, runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 realmIdentity.dispose();
                 return stateRef.get().verifyEvidence(evidence);
@@ -1705,7 +1750,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
         void setPrincipal(final Principal principal, final boolean exclusive) throws RealmUnavailableException {
             Assert.checkNotNullParam("principal", principal);
             final AtomicReference<State> stateRef = getStateRef();
-            final State newState = assignName(capturedIdentity, mechanismConfiguration, getMechanismRealmConfiguration(), principal, null, privateCredentials, publicCredentials, exclusive);
+            final State newState = assignName(capturedIdentity, mechanismConfiguration, getMechanismRealmConfiguration(), principal, null, privateCredentials, publicCredentials, exclusive, runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 if (newState.isNameAssigned()) {
                     ((NameAssignedState)newState).realmIdentity.dispose();
@@ -1726,14 +1771,18 @@ public final class ServerAuthenticationContext implements AutoCloseable {
         IdentityCredentials getPublicCredentials() {
             return publicCredentials;
         }
+
+        Attributes getRuntimeAttributes() {
+            return runtimeAttributes;
+        }
     }
 
     final class InitialState extends UnassignedState {
 
         private final MechanismConfigurationSelector mechanismConfigurationSelector;
 
-        InitialState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismConfigurationSelector mechanismConfigurationSelector, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials) {
-            super(capturedIdentity, mechanismConfiguration, privateCredentials, publicCredentials);
+        InitialState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismConfigurationSelector mechanismConfigurationSelector, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {
+            super(capturedIdentity, mechanismConfiguration, privateCredentials, publicCredentials, runtimeAttributes);
             this.mechanismConfigurationSelector = mechanismConfigurationSelector;
         }
 
@@ -1749,7 +1798,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
                 throw log.invalidMechRealmSelection(realmName);
             }
             final AtomicReference<State> stateRef = getStateRef();
-            if (! stateRef.compareAndSet(this, new RealmAssignedState(capturedIdentity, mechanismConfiguration, configuration, privateCredentials, publicCredentials))) {
+            if (! stateRef.compareAndSet(this, new RealmAssignedState(capturedIdentity, mechanismConfiguration, configuration, privateCredentials, publicCredentials, runtimeAttributes))) {
                 stateRef.get().setMechanismRealmName(realmName);
             }
         }
@@ -1768,7 +1817,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         @Override
         void setMechanismInformation(MechanismInformation mechanismInformation) {
-            InactiveState inactiveState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials);
+            InactiveState inactiveState = new InactiveState(capturedIdentity, mechanismConfigurationSelector, mechanismInformation, privateCredentials, publicCredentials, runtimeAttributes);
             InitialState newState = inactiveState.selectMechanismConfiguration();
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().setMechanismInformation(mechanismInformation);
@@ -1776,7 +1825,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
         }
 
         void addPublicCredential(final Credential credential) {
-            final InitialState newState = new InitialState(getSourceIdentity(), getMechanismConfiguration(), mechanismConfigurationSelector, getPrivateCredentials(), getPublicCredentials().withCredential(credential));
+            final InitialState newState = new InitialState(getSourceIdentity(), getMechanismConfiguration(), mechanismConfigurationSelector, getPrivateCredentials(), getPublicCredentials().withCredential(credential), runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().addPublicCredential(credential);
             }
@@ -1784,9 +1833,16 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         @Override
         void addPrivateCredential(final Credential credential) {
-            final InitialState newState = new InitialState(getSourceIdentity(), getMechanismConfiguration(), mechanismConfigurationSelector, getPrivateCredentials().withCredential(credential), getPublicCredentials());
+            final InitialState newState = new InitialState(getSourceIdentity(), getMechanismConfiguration(), mechanismConfigurationSelector, getPrivateCredentials().withCredential(credential), getPublicCredentials(), runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().addPublicCredential(credential);
+            }
+        }
+
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+            final InitialState newState = new InitialState(getSourceIdentity(), getMechanismConfiguration(), mechanismConfigurationSelector, getPrivateCredentials(), getPublicCredentials(), AggregateAttributes.aggregateOf(getRuntimeAttributes(), runtimeAttributes));
+            if (! stateRef.compareAndSet(this, newState)) {
+                stateRef.get().addRuntimeAttributes(runtimeAttributes);
             }
         }
     }
@@ -1794,8 +1850,8 @@ public final class ServerAuthenticationContext implements AutoCloseable {
     final class RealmAssignedState extends UnassignedState {
         final MechanismRealmConfiguration mechanismRealmConfiguration;
 
-        RealmAssignedState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials) {
-            super(capturedIdentity, mechanismConfiguration, privateCredentials, publicCredentials);
+        RealmAssignedState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {
+            super(capturedIdentity, mechanismConfiguration, privateCredentials, publicCredentials, runtimeAttributes);
             this.mechanismRealmConfiguration = mechanismRealmConfiguration;
         }
 
@@ -1806,7 +1862,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         @Override
         void addPublicCredential(final Credential credential) {
-            final RealmAssignedState newState = new RealmAssignedState(getSourceIdentity(), getMechanismConfiguration(), getMechanismRealmConfiguration(), getPrivateCredentials(), getPublicCredentials().withCredential(credential));
+            final RealmAssignedState newState = new RealmAssignedState(getSourceIdentity(), getMechanismConfiguration(), getMechanismRealmConfiguration(), getPrivateCredentials(), getPublicCredentials().withCredential(credential), runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().addPublicCredential(credential);
             }
@@ -1814,9 +1870,17 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         @Override
         void addPrivateCredential(final Credential credential) {
-            final RealmAssignedState newState = new RealmAssignedState(getSourceIdentity(), getMechanismConfiguration(), getMechanismRealmConfiguration(), getPrivateCredentials().withCredential(credential), getPublicCredentials());
+            final RealmAssignedState newState = new RealmAssignedState(getSourceIdentity(), getMechanismConfiguration(), getMechanismRealmConfiguration(), getPrivateCredentials().withCredential(credential), getPublicCredentials(), runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().addPublicCredential(credential);
+            }
+        }
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+            final RealmAssignedState newState = new RealmAssignedState(getSourceIdentity(), getMechanismConfiguration(), getMechanismRealmConfiguration(), getPrivateCredentials(), getPublicCredentials(), AggregateAttributes.aggregateOf(getRuntimeAttributes(), runtimeAttributes));
+            if (! stateRef.compareAndSet(this, newState)) {
+                stateRef.get().addRuntimeAttributes(runtimeAttributes);
             }
         }
     }
@@ -1825,8 +1889,8 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         final MechanismRealmConfiguration mechanismRealmConfiguration;
 
-        InvalidNameState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials) {
-            super(capturedIdentity, mechanismConfiguration, privateCredentials, publicCredentials);
+        InvalidNameState(final SecurityIdentity capturedIdentity, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {
+            super(capturedIdentity, mechanismConfiguration, privateCredentials, publicCredentials, runtimeAttributes);
             this.mechanismRealmConfiguration = mechanismRealmConfiguration;
         }
 
@@ -1864,8 +1928,9 @@ public final class ServerAuthenticationContext implements AutoCloseable {
         private final MechanismRealmConfiguration mechanismRealmConfiguration;
         private final IdentityCredentials privateCredentials;
         private final IdentityCredentials publicCredentials;
+        private final Attributes runtimeAttributes;
 
-        NameAssignedState(final SecurityIdentity capturedIdentity, final RealmInfo realmInfo, final RealmIdentity realmIdentity, final Principal authenticationPrincipal, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials) {
+        NameAssignedState(final SecurityIdentity capturedIdentity, final RealmInfo realmInfo, final RealmIdentity realmIdentity, final Principal authenticationPrincipal, final MechanismConfiguration mechanismConfiguration, final MechanismRealmConfiguration mechanismRealmConfiguration, final IdentityCredentials privateCredentials, final IdentityCredentials publicCredentials, final Attributes runtimeAttributes) {
             this.capturedIdentity = capturedIdentity;
             this.realmInfo = realmInfo;
             this.realmIdentity = realmIdentity;
@@ -1874,6 +1939,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
             this.mechanismRealmConfiguration = mechanismRealmConfiguration;
             this.privateCredentials = privateCredentials;
             this.publicCredentials = publicCredentials;
+            this.runtimeAttributes = runtimeAttributes;
         }
 
         @Override
@@ -1937,7 +2003,8 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
             final RealmInfo realmInfo = this.realmInfo;
             final Principal authenticationPrincipal = this.authenticationPrincipal;
-            final AuthorizationIdentity authorizationIdentity = realmIdentity.getAuthorizationIdentity();
+            final AuthorizationIdentity authorizationIdentity = runtimeAttributes == Attributes.EMPTY ? realmIdentity.getAuthorizationIdentity()
+                    : AuthorizationIdentity.basicIdentity(realmIdentity.getAuthorizationIdentity(), runtimeAttributes);
             final SecurityDomain domain = capturedIdentity.getSecurityDomain();
 
             SecurityIdentity authorizedIdentity = Assert.assertNotNull(domain.transform(new SecurityIdentity(domain, authenticationPrincipal, realmInfo, authorizationIdentity, domain.getCategoryRoleMappers(), IdentityCredentials.NONE, IdentityCredentials.NONE)));
@@ -1947,6 +2014,8 @@ public final class ServerAuthenticationContext implements AutoCloseable {
                 if (authorizationIdentity != null) {
                     log.tracef("Authorizing against the following attributes: %s => %s",
                             authorizationIdentity.getAttributes().keySet(), authorizationIdentity.getAttributes().values());
+                    log.tracef("Authorizing against the following runtime attributes: %s => %s",
+                            authorizationIdentity.getRuntimeAttributes().keySet(), authorizationIdentity.getRuntimeAttributes().values());
                 } else {
                     log.tracef("Authorizing against the following attributes: Cannot obtain the attributes. Authorization Identity is null.");
                 }
@@ -1963,8 +2032,8 @@ public final class ServerAuthenticationContext implements AutoCloseable {
             ElytronMessages.log.trace("Authorization succeed");
             return new AuthorizedAuthenticationState(authorizedIdentity, authenticationPrincipal, realmInfo, realmIdentity, mechanismRealmConfiguration, mechanismConfiguration);
         }
-
         @Override
+
         boolean authorize(final Principal authorizationId, final boolean authorizeRunAs) throws RealmUnavailableException {
             final AuthorizedAuthenticationState authzState = doAuthorization(true);
             if (authzState == null) {
@@ -2034,7 +2103,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         @Override
         void addPublicCredential(final Credential credential) {
-            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), getRealmInfo(), getRealmIdentity(), getAuthenticationPrincipal(), getMechanismConfiguration(), getMechanismRealmConfiguration(), privateCredentials, publicCredentials.withCredential(credential));
+            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), getRealmInfo(), getRealmIdentity(), getAuthenticationPrincipal(), getMechanismConfiguration(), getMechanismRealmConfiguration(), privateCredentials, publicCredentials.withCredential(credential), runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().addPublicCredential(credential);
             }
@@ -2042,9 +2111,17 @@ public final class ServerAuthenticationContext implements AutoCloseable {
 
         @Override
         void addPrivateCredential(final Credential credential) {
-            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), getRealmInfo(), getRealmIdentity(), getAuthenticationPrincipal(), getMechanismConfiguration(), getMechanismRealmConfiguration(), privateCredentials.withCredential(credential), publicCredentials);
+            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), getRealmInfo(), getRealmIdentity(), getAuthenticationPrincipal(), getMechanismConfiguration(), getMechanismRealmConfiguration(), privateCredentials.withCredential(credential), publicCredentials, runtimeAttributes);
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().addPublicCredential(credential);
+            }
+        }
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+            final NameAssignedState newState = new NameAssignedState(getSourceIdentity(), getRealmInfo(), getRealmIdentity(), getAuthenticationPrincipal(), getMechanismConfiguration(), getMechanismRealmConfiguration(), privateCredentials, publicCredentials, AggregateAttributes.aggregateOf(this.runtimeAttributes, runtimeAttributes));
+            if (! stateRef.compareAndSet(this, newState)) {
+                stateRef.get().addRuntimeAttributes(runtimeAttributes);
             }
         }
 
@@ -2225,7 +2302,7 @@ public final class ServerAuthenticationContext implements AutoCloseable {
                 ElytronMessages.log.trace("RunAs authorization succeed - the same identity");
                 return this;
             }
-            final State state = assignName(authorizedIdentity, getMechanismConfiguration(), getMechanismRealmConfiguration(), authorizationId, null, IdentityCredentials.NONE, IdentityCredentials.NONE);
+            final State state = assignName(authorizedIdentity, getMechanismConfiguration(), getMechanismRealmConfiguration(), authorizationId, null, IdentityCredentials.NONE, IdentityCredentials.NONE, Attributes.EMPTY);
             if (!state.isNameAssigned()) {
                 ElytronMessages.log.tracef("RunAs authorization failed - unable to assign identity name");
                 return null;
@@ -2275,6 +2352,15 @@ public final class ServerAuthenticationContext implements AutoCloseable {
             final AuthorizedState newState = new AuthorizedState(sourceIdentity.withPrivateCredential(credential), getAuthenticationPrincipal(), getRealmInfo(), getMechanismConfiguration(), getMechanismRealmConfiguration());
             if (! stateRef.compareAndSet(this, newState)) {
                 stateRef.get().addPrivateCredential(credential);
+            }
+        }
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+            final SecurityIdentity sourceIdentity = getSourceIdentity();
+            final AuthorizedState newState = new AuthorizedState(sourceIdentity.withRuntimeAttributes(runtimeAttributes), getAuthenticationPrincipal(), getRealmInfo(), getMechanismConfiguration(), getMechanismRealmConfiguration());
+            if (! stateRef.compareAndSet(this, newState)) {
+                stateRef.get().addRuntimeAttributes(runtimeAttributes);
             }
         }
     }
@@ -2360,6 +2446,16 @@ public final class ServerAuthenticationContext implements AutoCloseable {
                 stateRef.get().addPrivateCredential(credential);
             }
         }
+
+        @Override
+        void addRuntimeAttributes(final Attributes runtimeAttributes) {
+            final SecurityIdentity sourceIdentity = getSourceIdentity();
+            final AuthorizedAuthenticationState newState = new AuthorizedAuthenticationState(sourceIdentity.withRuntimeAttributes(runtimeAttributes), getAuthenticationPrincipal(), getRealmInfo(), getRealmIdentity(), getMechanismRealmConfiguration(), getMechanismConfiguration());
+            if (! stateRef.compareAndSet(this, newState)) {
+                stateRef.get().addRuntimeAttributes(runtimeAttributes);
+            }
+        }
+
     }
 
     static final class CompleteState extends State {

@@ -84,6 +84,7 @@ public final class SecurityDomain {
     static final ElytronPermission GET_IDENTITY = ElytronPermission.forName("getIdentity");
     static final ElytronPermission GET_IDENTITY_FOR_UPDATE = ElytronPermission.forName("getIdentityForUpdate");
     static final ElytronPermission CREATE_AD_HOC_IDENTITY = ElytronPermission.forName("createAdHocIdentity");
+    static final ElytronPermission HANDLE_SECURITY_EVENT = ElytronPermission.forName("handleSecurityEvent");
 
     private final Map<String, RealmInfo> realmMap;
     private final String defaultRealmName;
@@ -99,6 +100,7 @@ public final class SecurityDomain {
     private final Predicate<SecurityDomain> trustedSecurityDomain;
     private final Consumer<SecurityEvent> securityEventListener;
     private final Function<Evidence, Principal> evidenceDecoder;
+    private final RoleDecoder roleDecoder;
 
     SecurityDomain(Builder builder, final LinkedHashMap<String, RealmInfo> realmMap) {
         this.realmMap = realmMap;
@@ -112,6 +114,7 @@ public final class SecurityDomain {
         this.trustedSecurityDomain = builder.trustedSecurityDomain;
         this.securityEventListener = builder.securityEventListener;
         this.evidenceDecoder = builder.evidenceDecoder;
+        this.roleDecoder = builder.roleDecoder;
         final Map<String, RoleMapper> originalRoleMappers = builder.categoryRoleMappers;
         final Map<String, RoleMapper> copiedRoleMappers;
         if (originalRoleMappers.isEmpty()) {
@@ -698,15 +701,19 @@ public final class SecurityDomain {
         // zeroth role mapping, just grab roles from the identity
         Roles decodedRoles = realmInfo.getRoleDecoder().decodeRoles(identity);
 
+        // determine roles based on any runtime attributes associated with the identity
+        Roles domainDecodedRoles = securityIdentity.getSecurityDomain().getRoleDecoder().decodeRoles(identity);
+        Roles combinedRoles = decodedRoles.or(domainDecodedRoles);
+
         // apply the first level mapping, which is based on the role mapper associated with a realm.
-        Roles realmMappedRoles = realmInfo.getRoleMapper().mapRoles(decodedRoles);
+        Roles realmMappedRoles = realmInfo.getRoleMapper().mapRoles(combinedRoles);
 
         // apply the second level mapping, which is based on the role mapper associated with this security domain.
         Roles domainMappedRoles = roleMapper.mapRoles(realmMappedRoles);
 
         if (log.isTraceEnabled()) {
-            log.tracef("Role mapping: principal [%s] -> decoded roles [%s] -> realm mapped roles [%s] -> domain mapped roles [%s]",
-                    securityIdentity.getPrincipal(), String.join(", ", decodedRoles), String.join(", ", realmMappedRoles), String.join(", ", domainMappedRoles));
+            log.tracef("Role mapping: principal [%s] -> decoded roles [%s] -> domain decoded roles [%s] -> realm mapped roles [%s] -> domain mapped roles [%s]",
+                    securityIdentity.getPrincipal(), String.join(", ", decodedRoles), String.join(", ", domainDecodedRoles), String.join(", ", realmMappedRoles), String.join(", ", domainMappedRoles));
         }
 
         return domainMappedRoles;
@@ -768,9 +775,22 @@ public final class SecurityDomain {
         return this == domain || trustedSecurityDomain.test(domain);
     }
 
-    void handleSecurityEvent(final SecurityEvent securityEvent) {
-        // If visibility of this method is increased double check the
-        // event does relate to this security domain.
+    /**
+     * Handle a {@link SecurityEvent}.
+     *
+     * Calling with enabled security manager requires {@code handleSecurityEvent} {@link ElytronPermission}.
+     *
+     * @param securityEvent {@link SecurityEvent} to be handled
+     * @see Builder#setSecurityEventListener(Consumer)
+     */
+    public void handleSecurityEvent(final SecurityEvent securityEvent) {
+        final SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(HANDLE_SECURITY_EVENT);
+        }
+        if (!securityEvent.getSecurityIdentity().getSecurityDomain().equals(this)) {
+            log.securityEventIdentityWrongDomain();
+        }
         this.securityEventListener.accept(securityEvent);
     }
 
@@ -786,6 +806,10 @@ public final class SecurityDomain {
 
     Function<Evidence, Principal> getEvidenceDecoder() {
         return evidenceDecoder;
+    }
+
+    RoleDecoder getRoleDecoder() {
+        return roleDecoder;
     }
 
     /**
@@ -807,6 +831,7 @@ public final class SecurityDomain {
         private Predicate<SecurityDomain> trustedSecurityDomain = domain -> false;
         private Consumer<SecurityEvent> securityEventListener = e -> {};
         private Function<Evidence, Principal> evidenceDecoder = evidence -> evidence.getDefaultPrincipal();
+        private RoleDecoder roleDecoder = RoleDecoder.EMPTY;
 
         Builder() {
         }
@@ -1024,6 +1049,20 @@ public final class SecurityDomain {
             Assert.checkNotNullParam("evidenceDecoder", evidenceDecoder);
             assertNotBuilt();
             this.evidenceDecoder = evidenceDecoder;
+            return this;
+        }
+
+        /**
+         * Set the role decoder for this security domain.
+         *
+         * @param roleDecoder the role decoder (must not be {@code null})
+         * @return this builder
+         * @since 1.11.0
+         */
+        public Builder setRoleDecoder(RoleDecoder roleDecoder) {
+            Assert.checkNotNullParam("roleDecoder", roleDecoder);
+            assertNotBuilt();
+            this.roleDecoder = roleDecoder;
             return this;
         }
 

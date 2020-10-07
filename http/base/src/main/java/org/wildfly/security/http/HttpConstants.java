@@ -78,6 +78,12 @@ public class HttpConstants {
     public static final String CONFIG_CREATE_NAME_GSS_INIT = CONFIG_BASE + ".create-name-gss-init";
 
     /**
+     * In clustered environment Security Identity is restored during failover, load balancer change node (not sticky behavior) and session passivation/activation.
+     * Set to "true" to disable this behavior.
+     */
+    public static final String CONFIG_DISABLE_RESTORE_SECURITY_IDENTITY = CONFIG_BASE + ".disable-restore-security-identity";
+
+    /**
      * A comma separated list of scopes in preferred order the mechanism should attempt to use to persist state including the
      * caching of any previously authenticated identity.
      *
@@ -135,6 +141,7 @@ public class HttpConstants {
     public static final String DIGEST_NAME = "DIGEST";
     public static final String DIGEST_SHA256_NAME = "DIGEST-SHA-256";
     public static final String DIGEST_SHA512_256_NAME = "DIGEST-SHA-512-256";
+    public static final String EXTERNAL_NAME = "EXTERNAL";
     public static final String FORM_NAME = "FORM";
     public static final String SPNEGO_NAME = "SPNEGO";
     public static final String BEARER_TOKEN = "BEARER_TOKEN";

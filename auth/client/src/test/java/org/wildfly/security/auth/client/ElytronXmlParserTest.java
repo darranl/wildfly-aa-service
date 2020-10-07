@@ -153,7 +153,48 @@ public class ElytronXmlParserTest {
         Assert.assertNotNull(node);
         Password password = node.getConfiguration().getCredentialSource().getCredential(PasswordCredential.class).getPassword();
         Assert.assertEquals(new String(PASSWORD), new String(((ClearPassword)password).getPassword()));
+    }
 
+    @Test
+    public void testWebservices() throws Exception {
+        URL config = getClass().getResource("test-wildfly-config-v1_5.xml");
+        SecurityFactory<AuthenticationContext> authContext = ElytronXmlParser.parseAuthenticationClientConfiguration(config.toURI());
+        Assert.assertNotNull(authContext);
+        RuleNode<AuthenticationConfiguration> node = authContext.create().authRuleMatching(new URI("http://webservices/"), null, null);
+        Assert.assertNotNull(node);
+        String wsHttpMechanism  = node.getConfiguration().getWsHttpMechanism();
+        String wsSecurityType = node.getConfiguration().getWsSecurityType();
+        Assert.assertEquals(wsHttpMechanism, "BASIC");
+        Assert.assertEquals(wsSecurityType, "UsernameToken");
+    }
+
+    @Test
+    public void testEmptyWebServices() throws Exception {
+        URL config = getClass().getResource("test-wildfly-config-v1_5.xml");
+        SecurityFactory<AuthenticationContext> authContext = ElytronXmlParser.parseAuthenticationClientConfiguration(config.toURI());
+        Assert.assertNotNull(authContext);
+        RuleNode<AuthenticationConfiguration> node = authContext.create().authRuleMatching(new URI("http://webservices-empty/"), null, null);
+        Assert.assertNotNull(node);
+        String wsSecurityType = node.getConfiguration().getWsSecurityType();
+        String wsHttpMechanism  = node.getConfiguration().getWsHttpMechanism();
+        Assert.assertNull(wsHttpMechanism);
+        Assert.assertNull(wsSecurityType);
+    }
+
+    @Test
+    public void testCipherSuites() throws Exception {
+        URL config = getClass().getResource("test-wildfly-config-v1_5.xml");
+        SecurityFactory<AuthenticationContext> authContext = ElytronXmlParser.parseAuthenticationClientConfiguration(config.toURI());
+        Assert.assertNotNull(authContext);
+        checkSSLContext(authContext, "http://both.org");
+        checkSSLContext(authContext, "http://selector-only.org");
+        checkSSLContext(authContext, "http://names-only.org");
+    }
+
+    private void checkSSLContext(SecurityFactory<AuthenticationContext> authContext, String uri) throws Exception {
+        RuleNode<SecurityFactory<SSLContext>> node = authContext.create().sslRuleMatching(new URI(uri), null, null);
+        Assert.assertNotNull(node);
+        Assert.assertNotNull(node.getConfiguration().create());
     }
 
     @BeforeClass

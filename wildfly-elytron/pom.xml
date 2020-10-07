@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.wildfly.security</groupId>
         <artifactId>wildfly-elytron-parent</artifactId>
-        <version>1.10.10.CR1-SNAPSHOT</version>
+        <version>1.13.1.CR1-SNAPSHOT</version>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
@@ -159,22 +159,26 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.1</version>                           
+                <version>3.2.1</version>
                 <executions>
-                  <execution>
-                      <phase>package</phase>
-                      <goals>
-                        <goal>shade</goal>
-                      </goals>
-                      <configuration>
-                          <createSourcesJar>true</createSourcesJar>
-                          <createDependencyReducedPom>false</createDependencyReducedPom>
-                          <artifactSet>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createSourcesJar>true</createSourcesJar>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <artifactSet>
                                 <excludes>
                                     <exclude>org.wildfly.common:wildfly-common</exclude>
                                 </excludes>
                             </artifactSet>
-                        </configuration>                  
+                            <transformers>
+                                <transformer
+                                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                            </transformers>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -312,6 +316,10 @@
         <dependency>
             <groupId>org.wildfly.security</groupId>
             <artifactId>wildfly-elytron-http-digest</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.wildfly.security</groupId>
+            <artifactId>wildfly-elytron-http-external</artifactId>
         </dependency>
         <dependency>
             <groupId>org.wildfly.security</groupId>
@@ -538,7 +546,7 @@
                                 <dependency>
                                     <groupId>org.wildfly.security</groupId>
                                     <artifactId>wildfly-elytron</artifactId>
-                                    <version>1.10.9.Final</version> <!-- When updating to next release, clear all exclusions. -->
+                                    <version>1.13.0.Final</version> <!-- When updating to next release, clear all exclusions. -->
                                     <type>jar</type>
                                 </dependency>
                             </oldVersion>
@@ -646,6 +654,11 @@
                                 <dependency>
                                     <groupId>org.wildfly.security</groupId>
                                     <artifactId>wildfly-elytron-http-digest</artifactId>
+                                    <version>${project.version}</version>
+                                </dependency>
+                                <dependency>
+                                    <groupId>org.wildfly.security</groupId>
+                                    <artifactId>wildfly-elytron-http-external</artifactId>
                                     <version>${project.version}</version>
                                 </dependency>
                                 <dependency>
@@ -920,6 +933,7 @@
                                     <include>org.wildfly.security.x500.cert</include>
                                 </includes>
                                 <excludes>
+                                    <exclude>org.wildfly.security.auth.client.ElytronMessages_$logger</exclude>
                                 </excludes>
                                 <includeExclusively>true</includeExclusively>
                             </parameter>

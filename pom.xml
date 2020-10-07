@@ -31,7 +31,7 @@
 
     <groupId>org.wildfly.security</groupId>
     <artifactId>wildfly-elytron-parent</artifactId>
-    <version>1.10.10.CR1-SNAPSHOT</version>
+    <version>1.13.1.CR1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>WildFly Elytron Parent</name>
@@ -57,37 +57,41 @@
     <properties>
         <jdk.min.version>11</jdk.min.version>
         <version.commons-cli>1.4</version.commons-cli>
-        <version.org.apache.commons>3.8</version.org.apache.commons>
         <version.io.smallrye.jwt>2.0.13</version.io.smallrye.jwt>
         <version.jakarta.enterprise>2.0.2</version.jakarta.enterprise>
+        <version.org.apache.commons>3.8.1</version.org.apache.commons>
         <version.org.apache.directory.server>2.0.0-M24</version.org.apache.directory.server>
         <version.org.apache.directory.api>1.0.0</version.org.apache.directory.api>
         <version.org.apache.directory.jdbm>2.0.0-M3</version.org.apache.directory.jdbm>
         <version.org.apache.directory.mavibot>1.0.0-M8</version.org.apache.directory.mavibot>
+        <version.org.bouncycastle>1.64</version.org.bouncycastle>
         <version.org.eclipse.microprofile.jwt.api>1.1.1</version.org.eclipse.microprofile.jwt.api>
+        <version.org.apache.sshd.common>2.3.0</version.org.apache.sshd.common>
 
         <version.org.jboss.logging>3.4.1.Final</version.org.jboss.logging>
-        <version.org.jboss.logmanager>2.1.14.Final</version.org.jboss.logmanager>
+        <version.org.jboss.logmanager>2.1.17.Final</version.org.jboss.logmanager>
         <version.org.jboss.logmanager.log4j-jboss>1.1.6.Final</version.org.jboss.logmanager.log4j-jboss>
-        <version.org.jboss.logging.tools>2.2.0.Final</version.org.jboss.logging.tools>
-        <version.org.jboss.modules>1.9.1.Final</version.org.jboss.modules>
+        <version.org.jboss.logging.tools>2.2.1.Final</version.org.jboss.logging.tools>
+        <version.org.jboss.modules>1.9.2.Final</version.org.jboss.modules>
         <version.org.jboss.slf4j>1.0.3.GA</version.org.jboss.slf4j>
-        <version.org.jboss.spec.org.jboss.spec.javax.security.jacc>1.0.1.Final</version.org.jboss.spec.org.jboss.spec.javax.security.jacc>        
-        <version.org.jboss.spec.javax.security.auth.message.jboss-jaspi-api_1.1_spec>1.0.2.Final</version.org.jboss.spec.javax.security.auth.message.jboss-jaspi-api_1.1_spec>
+        <version.org.jboss.spec.org.jboss.spec.javax.security.jacc>2.0.0.Final</version.org.jboss.spec.org.jboss.spec.javax.security.jacc>
+        <version.org.jboss.spec.javax.security.auth.message.jboss-jaspi-api_1.1_spec>2.0.1.Final</version.org.jboss.spec.javax.security.auth.message.jboss-jaspi-api_1.1_spec>
         <version.org.jboss.spec.javax.servlet.jboss-servlet-api_3.1_spec>1.0.2.Final</version.org.jboss.spec.javax.servlet.jboss-servlet-api_3.1_spec>
-        <version.org.jboss.spec.jboss-json-api_1.0_spec>1.0.0.Final</version.org.jboss.spec.jboss-json-api_1.0_spec>
-        <version.org.jboss.threads>2.3.3.Final</version.org.jboss.threads>
+        <version.org.jboss.spec.jboss-json-api_1.0_spec>1.0.1.Final</version.org.jboss.spec.jboss-json-api_1.0_spec>
+        <version.org.jboss.spec.javax.xml.ws>2.0.5.Final</version.org.jboss.spec.javax.xml.ws>
+        <version.org.jboss.threads>2.4.0.Final</version.org.jboss.threads>
+        <version.org.jboss.ws.jbossws-spi>3.3.0.Final</version.org.jboss.ws.jbossws-spi>
         <version.org.kohsuke.metainf-services.metainf-services>1.7</version.org.kohsuke.metainf-services.metainf-services>
         <version.junit.junit>4.12</version.junit.junit>
         <version.jmockit>1.33</version.jmockit>
         <version.hsqldb>2.4.0</version.hsqldb>
         <version.org.glassfish.javax.json>1.0.4</version.org.glassfish.javax.json>
         <version.net.minidev.json-smart>2.3</version.net.minidev.json-smart>
-        <version.com.nimbusds.nimbus-jose-jwt>4.39.2</version.com.nimbusds.nimbus-jose-jwt>
+        <version.com.nimbusds.nimbus-jose-jwt>8.2.1</version.com.nimbusds.nimbus-jose-jwt>
         <version.com.squareup.okhttp3.mockwebserver>3.8.1</version.com.squareup.okhttp3.mockwebserver>
         <version.org.wildfly.checkstyle-config>1.0.8.Final</version.org.wildfly.checkstyle-config>
         <version.org.wildfly.client.config>1.0.1.Final</version.org.wildfly.client.config>
-        <version.org.wildfly.common>1.5.1.Final</version.org.wildfly.common>
+        <version.org.wildfly.common>1.5.4.Final</version.org.wildfly.common>
         <version.commons-io.commons-io>2.6</version.commons-io.commons-io>
         <version.org.mock-server.mockserver-netty>5.4.1</version.org.mock-server.mockserver-netty>
         <version.org.xipki.pki.ocsp-server>3.0.0</version.org.xipki.pki.ocsp-server>
@@ -250,6 +254,7 @@
                         <notimestamp>true</notimestamp>
                         <doclint>none</doclint>
                         <show>protected</show>
+                        <source>8</source> <!-- See https://bugs.openjdk.java.net/browse/JDK-8212233 -->
                         <sourcepath>
                             ${project.basedir}/asn1/src/main/java/;
                             ${project.basedir}/audit/src/main/java/;
@@ -276,6 +281,7 @@
                             ${project.basedir}/http/cert/src/main/java/;
                             ${project.basedir}/http/deprecated/src/main/java/;
                             ${project.basedir}/http/digest/src/main/java/;
+                            ${project.basedir}/http/external/src/main/java/;
                             ${project.basedir}/http/form/src/main/java/;
                             ${project.basedir}/http/spnego/src/main/java/;
                             ${project.basedir}/http/sso/src/main/java/;
@@ -332,7 +338,7 @@
                                 <goal>aggregate</goal>
                             </goals>
                             <configuration>
-                                <destDir>api-javadoc</destDir>
+                                <destDir>api-javadoc</destDir>                                
                                 <sourceFileIncludes>
                                     <include>org/wildfly/security/*.java</include>
                                     <include>org/wildfly/security/asn1/*.java</include>
@@ -540,6 +546,11 @@
             <dependency>
                 <groupId>org.wildfly.security</groupId>
                 <artifactId>wildfly-elytron-http-digest</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.wildfly.security</groupId>
+                <artifactId>wildfly-elytron-http-external</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -815,6 +826,7 @@
             <!--
                  External Modules
             -->
+
             <dependency>
                 <groupId>jakarta.enterprise</groupId>
                 <artifactId>jakarta.enterprise.cdi-api</artifactId>
@@ -837,6 +849,11 @@
                 <artifactId>microprofile-jwt-auth-api</artifactId>
                 <version>${version.org.eclipse.microprofile.jwt.api}</version>
                 <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.sshd</groupId>
+                <artifactId>sshd-common</artifactId>
+                <version>${version.org.apache.sshd.common}</version>
             </dependency>
             <dependency>
                 <groupId>commons-cli</groupId>
@@ -1021,6 +1038,10 @@
                         <groupId>org.apache.directory.jdbm</groupId>
                         <artifactId>apacheds-jdbm1</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>org.bouncycastle</groupId>
+                        <artifactId>bcprov-jdk15on</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
@@ -1079,7 +1100,7 @@
             <dependency>
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcmail-jdk15on</artifactId>
-                <version>1.56</version>
+                <version>${version.org.bouncycastle}</version>
                 <scope>test</scope>
             </dependency>
 
@@ -1283,6 +1304,7 @@
         <module>http/cert</module>
         <module>http/deprecated</module>
         <module>http/digest</module>
+        <module>http/external</module>
         <module>http/form</module>
         <module>http/spnego</module>
         <module>http/sso</module>
